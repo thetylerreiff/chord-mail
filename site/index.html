@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Chord: keyboard-driven Gmail for Omarchy</title>
 <meta name="description" content="A Gmail client for Omarchy that lives on your keyboard. Fast, focused, and local-first. Free and open source.">
-<meta name="theme-color" content="#0a0a0b">
+<meta name="theme-color" content="#ebe8df">
 <meta property="og:type" content="website">
 <meta property="og:url" content="https://chord.thetylerreiff.co/">
 <meta property="og:title" content="Chord: keyboard-driven Gmail for Omarchy">
@@ -15,161 +15,75 @@
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist+Mono:wght@400;500;700&display=swap">
-<link rel="stylesheet" href="/src/style.css">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,100..900&family=Martian+Mono:wdth,wght@75..112.5,100..800&display=swap">
+<link rel="stylesheet" href="/src/base.css">
+<link rel="stylesheet" href="/src/chord.css">
 </head>
 <body>
-<div class="frame">
-  <span class="crop tl"></span><span class="crop tr"></span><span class="crop bl"></span><span class="crop br"></span>
+<section class="hero" aria-label="Chord">
+  <div class="block key">
+    <div class="key-top label"><a class="mark" href="/">CHORD</a><span>0.1.0</span></div>
+    <div class="readout" aria-hidden="true">
+      <span class="label" id="key-label">Press</span>
+      <span class="glyph display" id="glyph">e</span>
+      <span class="verb display" id="verb">Done</span>
+    </div>
+    <a class="down label" href="#keys">Every key, drawn <span aria-hidden="true">↓</span></a>
+  </div>
 
-  <header class="meta up">
-    <ul>
-      <li>Chord / Mail</li>
-      <li>Keyboard-driven Gmail</li>
-      <li class="dim">v0.1.0 · Omarchy</li>
+  <div class="block mail">
+    <div class="mail-top label">
+      <span>Fig. 01 — The inbox, working</span>
+      <button type="button" class="keys-toggle" aria-pressed="true" aria-label="Keys">Keys</button>
+    </div>
+    <div class="inbox" id="inbox"></div>
+    <p class="tally"><span class="display n" id="left">5</span><span class="label" id="left-label">threads left in Primary</span></p>
+  </div>
+
+  <div class="block info">
+    <nav class="nav label" aria-label="Site">
+      <a class="mark phone-mark" href="/">CHORD <span class="ver">0.1.0</span></a>
+      <a href="https://github.com/thetylerreiff/chord-mail">GitHub ↗</a>
+      <a href="https://github.com/thetylerreiff/chord-mail#connect-gmail">Connect Gmail ↗</a>
+    </nav>
+    <h1 class="display head">Mail at the speed of a keypress.</h1>
+    <p class="lede">A Gmail client for Omarchy that lives on your keyboard. It reads only from a local cache, so it never waits on the network.</p>
+    <ul class="facts label">
+      <li>Cache <span>SQLite, local, offline</span></li>
+      <li>Compose <span>Neovim</span></li>
+      <li>Theme <span>follows Omarchy</span></li>
+      <li>Sign-in <span>your own OAuth client</span></li>
+      <li>CLI <span>--json</span></li>
+      <li>License <span>MIT</span></li>
     </ul>
-    <ul class="links">
-      <li><a href="https://github.com/thetylerreiff/chord-mail">[ GitHub ]</a></li>
-      <li><a href="https://github.com/thetylerreiff/chord-mail#connect-gmail">[ Connect Gmail ]</a></li>
-      <li><a href="/install">[ Install script ]</a></li>
-    </ul>
+    <div class="install" id="install">
+      <div class="label install-top"><span>Install · Arch / Omarchy</span><a href="/install">Script ↗</a></div>
+      <code id="cmd">curl -fsSL https://<wbr>chord.thetylerreiff.co/<wbr><span class="nb">install | bash</span></code>
+      <button type="button" id="copy" class="label"><span data-label>Copy</span></button>
+    </div>
+  </div>
+</section>
+
+<section class="plate" id="keys" aria-labelledby="keys-h">
+  <header class="plate-top">
+    <h2 class="label" id="keys-h">Fig. 02 — The keymap</h2>
+    <p class="label hint">Every black key does something in Chord. <span class="kb">Press one.</span><span class="touch">Tap one.</span> <button type="button" class="keys-toggle" aria-pressed="true" aria-label="Keys">Keys</button></p>
   </header>
-
-  <main>
-    <section class="copy">
-      <p class="flourish">~*~ free and open source · MIT · since 2026 ~*~</p>
-      <h1>
-        <svg class="wordmark" viewBox="0 0 910 150" role="img" aria-label="Chord">
-          <mask id="wm">
-            <polygon fill="#fff" points="26,0 124,0 150,26 150,124 124,150 26,150 0,124 0,26"/>
-            <polygon fill="#000" points="34,26 152,26 152,124 34,124 26,116 26,34"/>
-            <polygon fill="#fff" points="190,0 216,0 216,150 190,150"/>
-            <polygon fill="#fff" points="314,0 340,0 340,150 314,150"/>
-            <polygon fill="#fff" points="190,62 340,62 340,88 190,88"/>
-            <polygon fill="#fff" points="406,0 504,0 530,26 530,124 504,150 406,150 380,124 380,26"/>
-            <polygon fill="#000" points="414,26 496,26 504,34 504,116 496,124 414,124 406,116 406,34"/>
-            <polygon fill="#fff" points="570,0 694,0 720,26 720,69.5 694,95.5 570,95.5"/>
-            <polygon fill="#000" points="596,26 686,26 694,34 694,61.5 686,69.5 596,69.5"/>
-            <polygon fill="#fff" points="570,0 596,0 596,150 570,150"/>
-            <polygon fill="#fff" points="627,82.5 658.2,82.5 720,150 688.8,150"/>
-            <polygon fill="#fff" points="760,0 858,0 910,52 910,98 858,150 760,150"/>
-            <polygon fill="#000" points="786,26 847.6,26 884,62.4 884,87.6 847.6,124 786,124"/>
-          </mask>
-          <rect width="910" height="150" fill="currentColor" mask="url(#wm)"/>
-        </svg>
-      </h1>
-
-      <h2>Mail at the speed of a keypress</h2>
-      <p class="sub">A Gmail client for Omarchy that lives on your keyboard. The window reads only from a local cache, so it never waits on the network, and Gmail catches up in the background.</p>
-
-      <pre class="spec" aria-label="Specifications">
-+---------+---------------------------------------+
-| <b>TRIAGE </b> | <span class="k">e</span> done · <span class="k">h</span> snooze · <span class="k">#</span> trash · <span class="k">z</span> undo  |
-| <b>CACHE  </b> | SQLite on your machine, works offline |
-| <b>COMPOSE</b> | Neovim in a floating terminal         |
-| <b>THEME  </b> | follows your Omarchy theme, live      |
-| <b>PRIVACY</b> | your own OAuth client, no middleman   |
-| <b>CLI    </b> | --json for scripts and agents         |
-+---------+---------------------------------------+</pre>
-
-      <div class="install">
-        <h2>Install</h2>
-        <div class="cmd">
-          <code id="install-cmd"><span class="p">$ </span>curl -fsSL https://chord.thetylerreiff.co/install | bash</code>
-          <button type="button" id="copy" title="Copy (c)" aria-label="Copy the install command">[ <span id="copy-text">Copy</span> ]</button>
-        </div>
-        <p class="more">Builds the Arch package from source, so Chord lands in your launcher with its background service. Arch or Omarchy, x86_64 or aarch64. Copy it with <kbd>c</kbd>. <a href="/install">[ Read the script ]</a></p>
+  <p class="label pan">Drag to see every key ↔</p>
+  <div class="board-wrap" id="board-wrap">
+    <svg id="board" class="board-svg" role="img" aria-label="A keyboard. The keys Chord uses are filled black; e, done, is orange."></svg>
+  </div>
+  <footer class="plate-foot">
+    <p class="say" id="readout" aria-live="off">press any black key.</p>
+    <div class="end">
+      <div class="end-install">
+        <code id="cmd2">curl -fsSL https://chord.thetylerreiff.co/<wbr>install | bash</code>
+        <button type="button" id="copy2" class="label"><span data-label>Copy</span></button>
       </div>
-    </section>
-
-    <figure id="fig" aria-labelledby="fig-cap">
-      <svg class="stack" id="stack" viewBox="-370 96 1130 720" role="img" aria-labelledby="stack-title">
-        <title id="stack-title">One keypress, exploded: the E key marks a message done in the local cache at once, and the cache syncs to Gmail in the background.</title>
-        <g transform="translate(0 452)"><g class="ring">
-          <path id="ring-path" fill="none" d="M -336 0 a 336 336 0 1 1 672 0 a 336 336 0 1 1 -672 0"/>
-          <text><textPath href="#ring-path" textLength="2103" lengthAdjust="spacing">CHORD · KEYBOARD-DRIVEN GMAIL · LOCAL-FIRST · BUILT FOR OMARCHY · FREE AND OPEN SOURCE · CHORD · KEYBOARD-DRIVEN GMAIL · LOCAL-FIRST · BUILT FOR OMARCHY · FREE AND OPEN SOURCE · </textPath></text>
-          <animateTransform attributeName="transform" type="rotate" from="0" to="360" dur="90s" repeatCount="indefinite"/>
-        </g></g>
-        <g class="slab">
-          <polygon class="face-l" points="-181.9,656 0,761 0,777 -181.9,672"/>
-          <polygon class="face-r" points="0,761 181.9,656 181.9,672 0,777"/>
-          <polygon class="face-top" points="0,551 181.9,656 0,761 -181.9,656"/>
-        </g>
-        <polygon class="env" points="-18.2,603.5 90.9,666.5 18.2,708.5 -90.9,645.5"/>
-        <polyline class="env" points="-18.2,603.5 -5.5,659.1 90.9,666.5"/>
-        <line class="axis" x1="0" y1="486" x2="0" y2="656"/>
-        <g class="slab">
-          <polygon class="face-l" points="-181.9,446 0,551 0,567 -181.9,462"/>
-          <polygon class="face-r" points="0,551 181.9,446 181.9,462 0,567"/>
-          <polygon class="face-top" points="0,341 181.9,446 0,551 -181.9,446"/>
-        </g>
-        <line class="row" x1="2.6" y1="377.5" x2="134.2" y2="453.5"/>
-        <line class="row" x1="-27.7" y1="395" x2="103.9" y2="471"/>
-        <line class="row" x1="-58" y1="412.5" x2="73.6" y2="488.5"/>
-        <g id="done-row"><line class="row unread" x1="-88.3" y1="430" x2="43.3" y2="506"/><circle cx="-102.2" cy="422" r="4" fill="var(--signal)"/></g>
-        <line class="row" x1="-118.6" y1="447.5" x2="13" y2="523.5"/>
-        <line class="axis" x1="0" y1="276" x2="0" y2="446"/>
-        <g id="key">
-          <polygon fill="var(--signal-mid)" points="-102.2,236 0,295 0,220 -72.7,178"/>
-          <polygon fill="var(--signal-low)" points="0,295 102.2,236 72.7,178 0,220"/>
-          <polygon fill="var(--signal)" points="0,136 72.7,178 0,220 -72.7,178"/>
-          <line class="edge" x1="-102.2" y1="236" x2="0" y2="295"/>
-          <line class="edge" x1="0" y1="295" x2="102.2" y2="236"/>
-          <line class="edge" x1="-102.2" y1="236" x2="-72.7" y2="178"/>
-          <line class="edge" x1="0" y1="295" x2="0" y2="220"/>
-          <line class="edge" x1="102.2" y1="236" x2="72.7" y2="178"/>
-          <text id="legend" transform="matrix(0.2255 0.1302 -0.2255 0.1302 0 178)" text-anchor="middle" dominant-baseline="central">E</text>
-        </g>
-        <circle id="pulse" r="6" cx="0" cy="0"/>
-        <g class="chip" id="chip" aria-hidden="true">
-          <rect x="-318" y="146" width="202" height="42"/>
-          <polygon points="-116,159 -104,167 -116,175"/>
-          <text x="-217" y="173" text-anchor="middle">PRESS E</text>
-        </g>
-        <g class="callouts">
-          <circle class="anchor a1" cx="72.7" cy="178" r="4"/>
-          <line class="leader" x1="82.7" y1="178" x2="380" y2="178"/>
-          <circle class="node" cx="380" cy="178" r="3.5"/>
-          <text class="num" x="404" y="172">01</text>
-          <text class="name" x="452" y="172">KEY</text>
-          <text class="note" x="452" y="200">E MARKS IT DONE</text>
-          <text class="status s1" x="452" y="224">● PRESSED</text>
-          <circle class="anchor a2" cx="181.9" cy="446" r="4"/>
-          <line class="leader" x1="191.9" y1="446" x2="380" y2="446"/>
-          <circle class="node" cx="380" cy="446" r="3.5"/>
-          <text class="num" x="404" y="440">02</text>
-          <text class="name" x="452" y="440">LOCAL CACHE</text>
-          <text class="note" x="452" y="468">THE WINDOW CHANGES AT ONCE</text>
-          <text class="status s2" x="452" y="492">● MOVED TO DONE</text>
-          <circle class="anchor a3" cx="181.9" cy="656" r="4"/>
-          <line class="leader" x1="191.9" y1="656" x2="380" y2="656"/>
-          <circle class="node" cx="380" cy="656" r="3.5"/>
-          <text class="num" x="404" y="650">03</text>
-          <text class="name" x="452" y="650">GMAIL</text>
-          <text class="note" x="452" y="678">SYNCED IN THE BACKGROUND</text>
-          <text class="status s3q" x="452" y="702">○ QUEUED</text><text class="status s3s" x="452" y="702">● SYNCED</text>
-        </g>
-      </svg>
-
-      <ol class="legend-list up">
-        <li><span class="n">01</span> Key · <span class="dim">E marks it done</span></li>
-        <li><span class="n">02</span> Local cache · <span class="dim">the window changes at once</span></li>
-        <li><span class="n">03</span> Gmail · <span class="dim">synced in the background</span></li>
-      </ol>
-
-      <figcaption class="up">
-        <span id="fig-cap">Fig. 1 · One keypress, exploded</span>
-        <button type="button" class="bracket up" id="run">[ Press e to run it ]</button>
-      </figcaption>
-    </figure>
-  </main>
-
-  <footer class="up">
-    <span>~*~ Linux x86_64 / aarch64 · MIT ~*~</span>
-    <span>Built by <a href="https://thetylerreiff.co">Tyler Reiff</a></span>
+      <p class="label fine">MIT · <a href="https://github.com/thetylerreiff/chord-mail">Source ↗</a> · <a href="https://github.com/thetylerreiff/chord-mail#connect-gmail">Connect Gmail ↗</a> · Built by <a href="https://thetylerreiff.co">Tyler Reiff</a></p>
+    </div>
   </footer>
-</div>
-
-<script type="module" src="/src/main.js"></script>
+</section>
+<script type="module" src="/src/chord.js"></script>
 </body>
 </html>
