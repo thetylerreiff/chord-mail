@@ -1,0 +1,13 @@
+#!/usr/bin/env bash
+# Seeds a made-up mailbox and screenshots the main screens offscreen into
+# target/demo/shots. Nothing touches your real mail or desktop.
+set -euo pipefail
+cd "$(dirname "$0")/.."
+cargo build -q
+D=$PWD/target/demo
+rm -rf "$D" && mkdir -p "$D/shots"
+python3 dev/seed-demo.py "$D" >/dev/null
+env -u WAYLAND_DISPLAY -u DISPLAY -u HYPRLAND_INSTANCE_SIGNATURE -u QT_QPA_PLATFORMTHEME XDG_DATA_HOME=$D/data XDG_CONFIG_HOME=$D/config XDG_CACHE_HOME=$D/cache \
+  CHORD_DEMO=1 CHORD_COMPOSE_CMD="$PWD/dev/fake-editor \"\$1\" \"\$2\" \"\$3\"" CHORD_SNAPSHOT=$D/shots QT_QPA_PLATFORM=offscreen QT_FORCE_STDERR_LOGGING=1 \
+  timeout 60 ./target/debug/chord-mail open 2>&1 | grep -vE 'Vulkan|libva|GPUInfo' || true
+ls "$D/shots"

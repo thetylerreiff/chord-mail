@@ -1,0 +1,38 @@
+# Builds Chord from this checkout. `bin/install` runs it.
+pkgname=chord-mail
+pkgver=0.1.0
+pkgrel=1
+pkgdesc="Keyboard-driven Gmail for Omarchy"
+arch=('x86_64' 'aarch64')
+license=('MIT')
+depends=('qt6-base' 'qt6-declarative' 'qt6-webengine' 'qt6-wayland' 'neovim'
+         'xdg-terminal-exec' 'xdg-utils' 'libnotify' 'gcc-libs' 'glibc')
+# lld links Chord (see .cargo/config.toml). Cargo comes from rustup as often
+# as from pacman, so it's checked in build() rather than declared here.
+makedepends=('lld')
+# Cargo does its own link-time optimization; makepkg's would fight it.
+options=('!lto' '!debug' '!strip')
+
+# makepkg exports RUSTFLAGS (empty by default), which would override the
+# linker flags in .cargo/config.toml.
+build() {
+  unset RUSTFLAGS
+  cd "$startdir/.."
+  command -v cargo >/dev/null || { echo "cargo is needed to build Chord (install rustup)" >&2; return 1; }
+  cargo build --release --locked -p chord-mail
+}
+
+check() {
+  unset RUSTFLAGS
+  cd "$startdir/.."
+  cargo test --release --locked --workspace
+}
+
+package() {
+  cd "$startdir/.."
+  install -Dm755 target/release/chord-mail "$pkgdir/usr/bin/chord-mail"
+  install -Dm644 pkgbuild/chord-mail.desktop "$pkgdir/usr/share/applications/chord-mail.desktop"
+  install -Dm644 pkgbuild/chord-mail.svg "$pkgdir/usr/share/icons/hicolor/scalable/apps/chord-mail.svg"
+  install -Dm644 pkgbuild/chord-mail.service "$pkgdir/usr/lib/systemd/user/chord-mail.service"
+  install -Dm644 LICENSE "$pkgdir/usr/share/licenses/$pkgname/LICENSE"
+}

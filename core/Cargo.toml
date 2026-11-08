@@ -1,0 +1,27 @@
+[package]
+name = "chord-core"
+description = "Chord's mail engine: Gmail sync, the local cache, the action queue, rendering, and composing"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+publish.workspace = true
+
+[dependencies]
+anyhow = "1.0.104"
+base64 = "0.23.1"
+chrono = "0.4.45"
+futures = "0.3.34"
+mail-builder = "2.0.1"
+mail-parser = "1.0.1"
+mime_guess = "2.0.5"
+pulldown-cmark = "0.13.6"
+rand = "0.10.3"
+reqwest = { version = "0.13.5", default-features = false, features = ["json", "rustls", "form", "query", "http2"] }
+rusqlite = { version = "0.41.1", features = ["bundled"] }
+serde = { version = "1.0.229", features = ["derive"] }
+serde_json = "1.0.154"
+sha2 = "0.11.1"
+tokio = { version = "1.54.1", features = ["net", "io-util", "macros", "rt", "time"] }
+toml = "1.2.1"
+url = "2.5.8"

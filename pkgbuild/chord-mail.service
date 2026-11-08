@@ -1,0 +1,12 @@
+[Unit]
+Description=Chord mail: sync, snoozes, scheduled mail, and notifications
+PartOf=graphical-session.target
+After=graphical-session.target
+
+[Service]
+ExecStart=/usr/bin/chord-mail daemon
+Restart=on-failure
+RestartSec=30
+
+[Install]
+WantedBy=graphical-session.target

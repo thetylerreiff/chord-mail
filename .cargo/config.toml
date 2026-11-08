@@ -1,0 +1,8 @@
+# Link with lld. Without this, cxx-qt falls back to gold when lld and mold are
+# missing, and gold (deprecated) crashes on Apple silicon with "internal error
+# in update_erratum_insn". The PKGBUILD pulls in lld as a build dependency.
+[target.aarch64-unknown-linux-gnu]
+rustflags = ["-C", "link-arg=-fuse-ld=lld"]
+
+[target.x86_64-unknown-linux-gnu]
+rustflags = ["-C", "link-arg=-fuse-ld=lld"]

@@ -1,0 +1,17 @@
+[Desktop Entry]
+Type=Application
+Name=Chord
+GenericName=Email
+Comment=Keyboard-driven Gmail
+Exec=chord-mail open %u
+Icon=chord-mail
+Terminal=false
+Categories=Network;Email;
+MimeType=x-scheme-handler/mailto;
+StartupWMClass=chord-mail
+Keywords=mail;email;gmail;inbox;
+Actions=compose;
+
+[Desktop Action compose]
+Name=New message
+Exec=chord-mail compose

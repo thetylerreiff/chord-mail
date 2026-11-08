@@ -1,0 +1,5 @@
+#!/usr/bin/env bash
+# Runs every test in the workspace. None of them touch the network or your mail.
+set -euo pipefail
+cd "$(dirname "$0")/.."
+cargo test --workspace "$@"

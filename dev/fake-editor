@@ -1,0 +1,15 @@
+#!/bin/sh
+# Stands in for Neovim in the screenshot tour: fills in a draft the way a
+# person would, then reports a clean exit. Arguments: draft, line, exit file.
+sed -i 's/^To: $/To: ada/; s/^Subject: $/Subject: Thursday review/' "$1"
+cat >> "$1" <<'MD'
+Hi Ada,
+
+The **table** reads well now. Two small things:
+
+- Step 2 should say *subtract*, not *minus*
+- Can we add a row for the loop?
+
+Thanks!
+MD
+echo 0 > "$3"

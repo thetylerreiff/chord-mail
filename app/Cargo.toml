@@ -1,0 +1,23 @@
+[package]
+name = "chord-mail"
+description = "Keyboard-driven Gmail for Omarchy"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+publish.workspace = true
+
+[dependencies]
+anyhow = "1.0.104"
+chord-core = { version = "0.1.0", path = "../core" }
+clap = { version = "4.6.7", features = ["derive"] }
+cxx = "1.0.205"
+cxx-qt = "0.10.0"
+cxx-qt-lib = { version = "0.10.0", features = ["qt_gui", "qt_qml", "qt_quickcontrols"] }
+futures = "0.3.34"
+serde = { version = "1.0.229", features = ["derive"] }
+serde_json = "1.0.154"
+tokio = { version = "1.54.1", features = ["rt-multi-thread", "macros"] }
+
+[build-dependencies]
+cxx-qt-build = "0.10.0"

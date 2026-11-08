@@ -1,0 +1,5 @@
+#!/usr/bin/env bash
+# Builds the release binary into target/release/chord-mail.
+set -euo pipefail
+cd "$(dirname "$0")/.."
+cargo build --release
