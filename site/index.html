@@ -12,178 +12,11 @@
 <meta property="og:description" content="Fast, focused, and local-first. Free and open source.">
 <meta property="og:image" content="https://chord.thetylerreiff.co/og.png">
 <meta name="twitter:card" content="summary_large_image">
-<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist+Mono:wght@400;500;700&display=swap">
-<style>
-  /* The README banner, made live, set like a plain-text document: stacked
-     meta, [ bracket ] links, # headings, an ASCII table. One accent, signal
-     orange, used only on things that act. */
-  :root {
-    --bg: #0a0a0b;
-    --dot: #1b1c20;
-    --hair: #34363c;
-    --dim: #7c7e86;
-    --soft: #b9b8b2;
-    --ink: #e9e8e3;
-    --signal: #ff5b1f;
-    --signal-mid: #e24c16;
-    --signal-low: #b0380e;
-    --face-top: #18191d;
-    --face-l: #111215;
-    --face-r: #0d0d10;
-    --mono: "Geist Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
-    --gutter: clamp(16px, 3.2vw, 48px);
-    color-scheme: dark;
-  }
-  * { box-sizing: border-box; }
-  html, body { margin: 0; }
-  body {
-    min-height: 100svh;
-    background: var(--bg) radial-gradient(var(--dot) 1.2px, transparent 1.5px) 0 0 / 20px 20px;
-    color: var(--ink);
-    font: 400 13px/1.75 var(--mono);
-    -webkit-font-smoothing: antialiased;
-  }
-  a { color: inherit; text-decoration: none; }
-  ::selection { background: var(--signal); color: var(--bg); }
-  :focus-visible { outline: 2px solid var(--signal); outline-offset: 3px; }
-  .up { text-transform: uppercase; letter-spacing: 0.06em; }
-  .dim { color: var(--dim); }
-
-  /* --- Frame ------------------------------------------------------------ */
-  .frame {
-    position: relative;
-    min-height: 100svh;
-    display: grid;
-    grid-template-rows: auto 1fr auto;
-    padding: calc(var(--gutter) * 0.75) var(--gutter);
-    padding-left: max(var(--gutter), env(safe-area-inset-left));
-    padding-right: max(var(--gutter), env(safe-area-inset-right));
-  }
-  .crop { position: absolute; width: 16px; height: 16px; border: 0 solid var(--hair); }
-  .crop.tl { top: 12px; left: 12px; border-top-width: 1px; border-left-width: 1px; }
-  .crop.tr { top: 12px; right: 12px; border-top-width: 1px; border-right-width: 1px; }
-  .crop.bl { bottom: 12px; left: 12px; border-bottom-width: 1px; border-left-width: 1px; }
-  .crop.br { bottom: 12px; right: 12px; border-bottom-width: 1px; border-right-width: 1px; }
-
-  .meta { display: flex; justify-content: space-between; align-items: flex-start; gap: 24px; line-height: 1.45; }
-  .meta ul { margin: 0; padding: 0; list-style: none; }
-  .meta .links { text-align: right; }
-  .meta .links a:hover, .bracket:hover { color: var(--signal); }
-  .meta .links .on { color: var(--signal); }
-
-  /* --- Hero --------------------------------------------------------------- */
-  main {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-    align-items: center;
-    gap: clamp(24px, 3vw, 56px);
-    padding-block: clamp(16px, 3vh, 40px);
-  }
-  .copy { display: grid; grid-template-columns: minmax(0, 1fr); gap: clamp(14px, 2.2vh, 22px); max-width: 620px; min-width: 0; }
-  .flourish { margin: 0; color: var(--dim); }
-  h1 { margin: 0; line-height: 0; }
-  .wordmark { width: min(100%, 470px); height: auto; color: var(--ink); }
-  h2 { margin: 0; font: 500 13px/1.5 var(--mono); letter-spacing: 0.06em; text-transform: uppercase; }
-  h2::before { content: "# "; color: var(--dim); }
-  .sub { margin: -8px 0 0; color: var(--soft); max-width: 56ch; text-wrap: pretty; }
-
-  pre.spec {
-    margin: 0;
-    font: 400 12.5px/1.6 var(--mono);
-    color: var(--dim);
-    overflow-x: auto;
-    scrollbar-width: none;
-  }
-  pre.spec b { font-weight: 500; color: var(--ink); }
-  pre.spec .k { color: var(--signal); font-weight: 700; }
-
-  .install { display: grid; grid-template-columns: minmax(0, 1fr); gap: 10px; }
-  .cmd { display: flex; align-items: stretch; border: 1px solid var(--hair); background: rgb(10 10 11 / 0.9); }
-  .cmd code {
-    flex: 1; min-width: 0;
-    padding: 11px 14px;
-    font: 400 13px/1.5 var(--mono);
-    white-space: nowrap; overflow-x: auto; scrollbar-width: none;
-  }
-  .cmd code::-webkit-scrollbar, pre.spec::-webkit-scrollbar { display: none; }
-  .cmd code .p { color: var(--signal); user-select: none; }
-  .cmd button {
-    flex: none;
-    padding: 0 14px;
-    font: 500 12px/1 var(--mono); letter-spacing: 0.06em; text-transform: uppercase;
-    color: var(--bg); background: var(--signal);
-    border: 0; cursor: pointer;
-  }
-  .cmd button:hover { background: #ff7a45; }
-  .install .more { margin: 0; color: var(--dim); }
-  .install .more kbd { font: inherit; color: var(--signal); }
-  .install .more a { color: var(--ink); white-space: nowrap; }
-  .install .more a:hover { color: var(--signal); }
-
-  /* --- Figure: the exploded keypress ----------------------------------- */
-  figure { margin: 0; display: grid; gap: 10px; min-width: 0; }
-  .stack { display: block; width: 100%; height: auto; max-height: 74svh; overflow: visible; }
-  .stack text { font-family: var(--mono); }
-  .ring text { font-size: 13px; fill: var(--dim); letter-spacing: 0.3em; }
-  .face-top { fill: var(--face-top); }
-  .face-l { fill: var(--face-l); }
-  .face-r { fill: var(--face-r); }
-  .slab polygon { stroke: var(--dim); stroke-width: 1.5; stroke-linejoin: round; }
-  .axis { stroke: var(--dim); stroke-width: 1.5; stroke-dasharray: 3 6; stroke-linecap: round; }
-  .row { stroke: var(--hair); stroke-width: 1.5; }
-  .row.unread { stroke: var(--ink); }
-  .env { fill: none; stroke: var(--ink); stroke-width: 1.5; stroke-linejoin: round; transition: stroke 0.25s; }
-  .leader { stroke: var(--dim); stroke-width: 1.5; stroke-dasharray: 1 6; stroke-linecap: round; }
-  .anchor, .node { fill: var(--bg); stroke: var(--ink); stroke-width: 1.5; transition: fill 0.2s, stroke 0.2s; }
-  .anchor { fill: var(--ink); }
-  .num { fill: var(--signal); font-weight: 500; font-size: 17px; letter-spacing: 0.1em; }
-  .name { fill: var(--ink); font-weight: 500; font-size: 17px; letter-spacing: 0.1em; }
-  .note { fill: var(--dim); font-size: 14px; letter-spacing: 0.1em; }
-  .status { fill: var(--signal); font-size: 13px; font-weight: 500; letter-spacing: 0.1em; opacity: 0; transition: opacity 0.2s; }
-  #key, .chip { cursor: pointer; }
-  #key .edge { stroke: #ff8c60; stroke-width: 1.2; }
-  #legend { font: 700 150px var(--mono); fill: var(--bg); }
-  #done-row { transition: opacity 0.35s, transform 0.45s cubic-bezier(0.3, 0, 0.2, 1); }
-  #pulse { fill: var(--signal); opacity: 0; }
-  .chip rect, .chip polygon { fill: var(--ink); }
-  .chip text { fill: var(--bg); font-size: 17px; font-weight: 500; letter-spacing: 0.12em; }
-  .chip:hover rect, .chip:hover polygon { fill: var(--signal); }
-
-  /* A run adds pressed, then local, then synced. */
-  .pressed .a1, .local .a2, .synced .a3 { fill: var(--signal); stroke: var(--signal); }
-  .pressed .s1, .local .s2, .local:not(.synced) .s3q, .synced .s3s { opacity: 1; }
-  .local #done-row { opacity: 0; transform: translate(30px, 17px); }
-  .synced .env { stroke: var(--signal); }
-  .pressed .chip { opacity: 0; }
-  .chip { transition: opacity 0.2s; }
-
-  figcaption { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 6px 16px; color: var(--dim); }
-  .bracket { padding: 0; font: inherit; color: var(--ink); background: none; border: 0; cursor: pointer; }
-  .legend-list { display: none; margin: 0; padding: 0; list-style: none; }
-
-  footer { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 6px 24px; color: var(--dim); }
-  footer a { color: var(--ink); }
-  footer a:hover { color: var(--signal); }
-
-  @media (max-width: 980px) {
-    main { grid-template-columns: minmax(0, 1fr); }
-    .copy { max-width: none; }
-    figure { max-width: 520px; width: 100%; justify-self: center; }
-    .stack { max-height: none; }
-    .callouts, .chip { display: none; }
-    .legend-list { display: grid; }
-    .legend-list .n { color: var(--signal); }
-  }
-  @media (max-width: 520px) {
-    pre.spec { font-size: 10.5px; }
-    .meta { flex-direction: column; gap: 10px; }
-    .meta .links { display: flex; flex-wrap: wrap; gap: 0 14px; text-align: left; }
-    .cmd code { font-size: 12px; }
-  }
-</style>
+<link rel="stylesheet" href="/src/style.css">
 </head>
 <body>
 <div class="frame">
@@ -198,7 +31,7 @@
     <ul class="links">
       <li><a href="https://github.com/thetylerreiff/chord-mail">[ GitHub ]</a></li>
       <li><a href="https://github.com/thetylerreiff/chord-mail#connect-gmail">[ Connect Gmail ]</a></li>
-      <li><a href="install">[ Install script ]</a></li>
+      <li><a href="/install">[ Install script ]</a></li>
     </ul>
   </header>
 
@@ -245,7 +78,7 @@
           <code id="install-cmd"><span class="p">$ </span>curl -fsSL https://chord.thetylerreiff.co/install | bash</code>
           <button type="button" id="copy" title="Copy (c)" aria-label="Copy the install command">[ <span id="copy-text">Copy</span> ]</button>
         </div>
-        <p class="more">Builds the Arch package from source, so Chord lands in your launcher with its background service. Arch or Omarchy, x86_64 or aarch64. Copy it with <kbd>c</kbd>. <a href="install">[ Read the script ]</a></p>
+        <p class="more">Builds the Arch package from source, so Chord lands in your launcher with its background service. Arch or Omarchy, x86_64 or aarch64. Copy it with <kbd>c</kbd>. <a href="/install">[ Read the script ]</a></p>
       </div>
     </section>
 
@@ -337,71 +170,6 @@
   </footer>
 </div>
 
-<script>
-  const fig = document.getElementById("fig");
-  const stack = document.getElementById("stack");
-  const key = document.getElementById("key");
-  const pulse = document.getElementById("pulse");
-  const still = matchMedia("(prefers-reduced-motion: reduce)");
-  const sleep = ms => new Promise(r => setTimeout(r, still.matches ? Math.min(ms, 400) : ms));
-  const move = (el, frames, ms) =>
-    still.matches ? Promise.resolve() : el.animate(frames, { duration: ms, easing: "cubic-bezier(.3,0,.2,1)" }).finished;
-
-  // One run: the key goes down, the cache changes at once, and Gmail
-  // catches up a beat later. Then it all resets.
-  let running = false;
-  async function press() {
-    if (running) return;
-    running = true;
-    fig.classList.add("pressed");
-    await move(key, [{ transform: "translateY(0)" }, { transform: "translateY(16px)" }, { transform: "translateY(0)" }], 240);
-    await move(pulse, [{ transform: "translateY(300px)", opacity: 1 }, { transform: "translateY(446px)", opacity: 1 }], 200);
-    fig.classList.add("local");
-    await sleep(900);
-    await move(pulse, [{ transform: "translateY(446px)", opacity: 1 }, { transform: "translateY(656px)", opacity: 1 }, { transform: "translateY(656px)", opacity: 0 }], 560);
-    fig.classList.add("synced");
-    await sleep(2400);
-    fig.classList.remove("pressed", "local", "synced");
-    await sleep(500);
-    running = false;
-  }
-
-  // Copy the install command, without the prompt.
-  const copyText = document.getElementById("copy-text");
-  async function copy() {
-    const cmd = document.getElementById("install-cmd").textContent.replace(/^\$\s*/, "");
-    try {
-      await navigator.clipboard.writeText(cmd);
-      copyText.textContent = "Copied";
-    } catch {
-      getSelection().selectAllChildren(document.getElementById("install-cmd"));
-      copyText.textContent = "Selected";
-    }
-    setTimeout(() => (copyText.textContent = "Copy"), 1600);
-  }
-
-  document.getElementById("copy").addEventListener("click", copy);
-  document.getElementById("run").addEventListener("click", press);
-  key.addEventListener("click", press);
-  document.getElementById("chip").addEventListener("click", press);
-  addEventListener("keydown", e => {
-    if (e.ctrlKey || e.metaKey || e.altKey || e.repeat) return;
-    if (e.key === "e" || e.key === "E") press();
-    else if (e.key === "c" || e.key === "C") copy();
-  });
-
-  // Narrow screens swap the callouts for a list, so crop to the stack.
-  const narrow = matchMedia("(max-width: 980px)");
-  const fit = () => stack.setAttribute("viewBox", narrow.matches ? "-350 100 700 700" : "-370 96 1130 720");
-  narrow.addEventListener("change", fit);
-  fit();
-
-  // The ring turns unless motion is reduced.
-  const ring = () => (still.matches ? stack.pauseAnimations() : stack.unpauseAnimations());
-  still.addEventListener("change", ring);
-  ring();
-
-  if (!still.matches) setTimeout(press, 900);
-</script>
+<script type="module" src="/src/main.js"></script>
 </body>
 </html>

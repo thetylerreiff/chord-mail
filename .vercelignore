@@ -1,0 +1,5 @@
+# Vercel only needs the site.
+/*
+!/site
+/site/node_modules
+/site/dist

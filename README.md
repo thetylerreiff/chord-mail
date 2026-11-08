@@ -65,8 +65,22 @@ Fast, focused, and local-first. Free and open source.
 ## Install
 
 Chord is built for [Omarchy](https://omarchy.org) on Arch Linux, on x86_64 and
-aarch64. Building it needs Rust, from [rustup](https://rustup.rs) or
-`pacman -S rust`.
+aarch64.
+
+```sh
+curl -fsSL https://chord.thetylerreiff.co/install | bash
+```
+
+The [script](site/public/install.sh) installs the build tools, builds the Arch
+package from source, and enables the background service. Run it again to
+update.
+
+<details>
+<summary><b>Or build it by hand</b></summary>
+
+<br>
+
+Building needs Rust, from [rustup](https://rustup.rs) or `pacman -S rust`.
 
 ```sh
 git clone https://github.com/thetylerreiff/chord-mail
@@ -78,6 +92,10 @@ systemctl --user enable --now chord-mail   # background sync, snoozes, and notif
 
 `bin/install` uses `makepkg`, which installs Chord's dependencies (Qt 6,
 Neovim, `lld`) with pacman. Chord then appears in the app launcher.
+
+</details>
+
+To have `mailto:` links open in Chord, run `chord-mail default`.
 
 ## Connect Gmail
 
@@ -301,7 +319,12 @@ bin/build    # release binary at target/release/chord-mail
 bin/test     # every test; none of them touch the network or your mail
 dev/tour     # screenshots of every screen from a made-up mailbox, offscreen
 dev/banner.py docs/banner.png   # redraws the banner above (needs Pillow)
+cd site && bun run dev          # the website, at http://localhost:4173
 ```
+
+The website lives in `site/` and deploys to
+[chord.thetylerreiff.co](https://chord.thetylerreiff.co) on Vercel from
+`main`. `site/public/install.sh` is the installer it serves at `/install`.
 
 `dev/tour` is the quickest way to check a UI change. It seeds an invented
 mailbox, drives the window offscreen, and writes a screenshot of each screen to
