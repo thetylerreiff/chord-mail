@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # Builds the Arch package from this checkout and installs it, so Chord shows
-# up in the app launcher with its icon and its background service.
+# up in the app launcher with its icon and its background service. Extra
+# arguments go to makepkg, e.g. `bin/install --nocheck` skips the tests.
 set -euo pipefail
 cd "$(dirname "$0")/../pkgbuild"
-makepkg -fsi --noconfirm
+makepkg -fsi --noconfirm "$@"
 rm -rf src pkg ./*.pkg.tar.*
