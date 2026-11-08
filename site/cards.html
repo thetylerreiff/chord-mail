@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Chord cards</title>
+<!-- The README banner and the link-preview image, drawn with the site's own type and inbox.
+     dev/cards renders it: ?banner at 1200×400 (2x), ?og at 1200×630. Not part of the site build. -->
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,100..900&family=Martian+Mono:wdth,wght@75..112.5,100..800&display=swap">
+<link rel="stylesheet" href="/src/base.css">
+<link rel="stylesheet" href="/src/chord.css">
+<style>
+  html, body { height: 100%; overflow: hidden; }
+  .hero { height: 100vh; min-height: 0; grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.45fr) minmax(0, 1fr); }
+  .block { padding: 22px 26px; }
+  .key { grid-template-rows: auto 1fr; }
+  .readout { min-height: 0; align-self: end; gap: 2vh; }
+  .glyph { font-size: 58vh; }
+  .verb { font-size: 11vh; }
+  .mail { grid-template-rows: auto 1fr; }
+  .mail .inbox { --row-h: 46px; }
+  .ib-acct { visibility: hidden; }
+  .ib-label { visibility: hidden; width: 0; }
+  .info { grid-template-rows: auto 1fr auto; }
+  .mark { font-size: 17px; }
+  .mark .ver { font: 500 11px 'Martian Mono', monospace; letter-spacing: 0.06em; color: var(--dim); margin-left: 8px; }
+  .head { font-size: 54px; }
+  .sub { margin: 14px 0 0; color: var(--dim); }
+  .install { display: none; }
+  .tally { display: none; }
+
+  /* The link preview is taller: room for the tally and the install line. */
+  .og .mail { grid-template-rows: auto 1fr; }
+  .og .tally { display: flex; }
+  .og .tally .n { font-size: 150px; }
+  .og .head { font-size: 50px; }
+  .og .verb { font-size: 56px; }
+  .og .install { display: block; padding: 12px 14px; font: 500 13px/1.45 'Martian Mono', monospace; }
+</style>
+</head>
+<body>
+<section class="hero">
+  <div class="block key">
+    <div class="key-top label"><span>Press</span><span></span></div>
+    <div class="readout">
+      <span class="glyph display">e</span>
+      <span class="verb display">Done</span>
+    </div>
+  </div>
+  <div class="block mail">
+    <div class="inbox" id="inbox"></div>
+    <p class="tally"><span class="display n">5</span><span class="label">threads left in Primary</span></p>
+  </div>
+  <div class="block info">
+    <div class="mark">CHORD<span class="ver">0.1.0</span></div>
+    <div style="align-self: end">
+      <h1 class="display head">Mail at the speed of a keypress.</h1>
+      <p class="label sub">Keyboard-driven Gmail for Omarchy</p>
+    </div>
+    <code class="install">chord.thetylerreiff.co</code>
+  </div>
+</section>
+<script type="module">
+  import { mountInbox } from '/src/inbox.js';
+  document.body.classList.toggle('og', location.search.includes('og'));
+  mountInbox(document.getElementById('inbox'), { listen: false, toggle: false });
+</script>
+</body>
+</html>

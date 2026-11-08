@@ -1,5 +1,5 @@
-/* Shared by the three candidates: reset, type roles, and the live inbox.
-   Each page sets the tokens (--ground, --ink, --dim, --rule, --panel, --signal...). */
+/* Reset, type roles, and the live inbox. chord.css sets the tokens
+   (--ground, --ink, --dim, --rule, --panel, --signal...). */
 
 *, *::before, *::after { box-sizing: border-box; }
 html, body { margin: 0; }

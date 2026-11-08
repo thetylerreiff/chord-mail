@@ -1,0 +1,21 @@
+#!/usr/bin/env bash
+# Renders the README banner (docs/banner.png, 2400×800) and the link-preview image
+# (site/public/og.png, 1200×630) from site/cards.html. Needs bun and chromium.
+set -euo pipefail
+cd "$(dirname "$0")/.."
+root=$PWD
+port=4179
+profile=$(mktemp -d)
+(cd site && exec bunx vite --port "$port" --strictPort >/dev/null 2>&1) &
+server=$!
+trap 'kill "$server" 2>/dev/null; rm -rf "$profile"' EXIT
+for _ in $(seq 1 40); do curl -sf "localhost:$port/cards.html" >/dev/null && break; sleep 0.25; done
+
+shoot() { # out, query, width, height, scale
+  chromium --headless --disable-gpu --hide-scrollbars --user-data-dir="$profile" \
+    --window-size="$3,$4" --force-device-scale-factor="$5" --virtual-time-budget=4000 \
+    --screenshot="$root/$1" "http://localhost:$port/cards.html?$2" 2>/dev/null
+  echo "$1"
+}
+shoot docs/banner.png banner 1200 400 2
+shoot site/public/og.png og 1200 630 1

@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="docs/banner.png" alt="Chord: keyboard-driven Gmail for Omarchy. An exploded drawing of one keypress: the E key, the local cache, and Gmail." width="100%">
+<img src="docs/banner.png" alt="Chord: mail at the speed of a keypress. Three blocks: the e key and Done in orange, Chord's inbox in black, and the headline on paper." width="100%">
 
 <br>
 <br>
@@ -318,7 +318,7 @@ sudo pacman -S --needed base-devel lld qt6-base qt6-declarative qt6-webengine qt
 bin/build    # release binary at target/release/chord-mail
 bin/test     # every test; none of them touch the network or your mail
 dev/tour     # screenshots of every screen from a made-up mailbox, offscreen
-dev/banner.py docs/banner.png   # redraws the banner above (needs Pillow)
+dev/cards       # redraws the banner above and the site's link preview (needs chromium)
 cd site && bun run dev          # the website, at http://localhost:4173
 ```
 
