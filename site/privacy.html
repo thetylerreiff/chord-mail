@@ -1,0 +1,142 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Privacy · Chord</title>
+<meta name="description" content="Chord has no servers. Your mail goes from Google to your computer and stays there.">
+<meta name="theme-color" content="#eff0ed">
+<link rel="canonical" href="https://chord.thetylerreiff.co/privacy">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Chord">
+<meta property="og:url" content="https://chord.thetylerreiff.co/privacy">
+<meta property="og:title" content="Privacy · Chord">
+<meta property="og:description" content="Chord has no servers. Your mail goes from Google to your computer and stays there.">
+<meta property="og:image" content="https://chord.thetylerreiff.co/og.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="Chord: mail at the speed of a keypress. The headline beside Chord's inbox, with CHORD set large along the bottom.">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,100..900&family=Martian+Mono:wdth,wght@75..112.5,100..800&display=swap">
+<link rel="stylesheet" href="/src/base.css">
+<link rel="stylesheet" href="/src/light.css">
+<link rel="stylesheet" href="/src/doc.css">
+</head>
+<body>
+<div class="doc">
+  <header class="rail">
+    <span class="label">Chord · keyboard-driven Gmail for Omarchy</span>
+    <nav class="nav" aria-label="Site">
+      <a href="/">Home</a>
+      <a href="/terms">Terms</a>
+      <a href="/privacy" aria-current="page">Privacy</a>
+      <a href="https://github.com/thetylerreiff/chord-mail">GitHub ↗</a>
+    </nav>
+  </header>
+
+  <div class="doc-head">
+    <p class="label"><b>Doc. 02</b><br>Effective 9 Nov 2026</p>
+    <div>
+      <h1 class="display">Privacy.</h1>
+      <p class="lede">Chord has no servers. Your mail goes from Google to your computer and stays there. Nobody behind Chord, including its author, can see your mail, your contacts, or your account.</p>
+    </div>
+  </div>
+
+  <main class="doc-body">
+    <section>
+      <h2 class="label"><b>01</b>What this covers</h2>
+      <div class="prose">
+        <p>This policy covers Chord, the open-source Gmail client for Omarchy (“the app”), its installer, and this website, chord.thetylerreiff.co. Chord is made by <a href="https://thetylerreiff.co">Tyler Reiff</a>. It is an independent project, not affiliated with Google or Omarchy.</p>
+      </div>
+    </section>
+
+    <section>
+      <h2 class="label"><b>02</b>Your Google account</h2>
+      <div class="prose">
+        <p>Chord connects to Gmail through an OAuth client that <em>you</em> create in your own Google Cloud project. Google issues your sign-in to that client, on your computer. It is never sent to Chord’s author or to anyone else.</p>
+        <p>Chord asks Google for one permission, the <code>gmail.modify</code> scope. It lets Chord read your mail and labels, and label, archive, trash, and send mail on your behalf. It can’t permanently delete mail, and it can’t touch anything in your Google account outside Gmail.</p>
+        <p>Chord uses this access only to show you your mail and to carry out the actions you take. Its use of information received from Google APIs adheres to the <a href="https://developers.google.com/terms/api-services-user-data-policy">Google API Services User Data Policy</a>, including the Limited Use requirements. Chord never transfers your Google data to anyone, never uses it for advertising, and never sells it.</p>
+      </div>
+    </section>
+
+    <section>
+      <h2 class="label"><b>03</b>Where the app connects</h2>
+      <div class="prose">
+        <p>The app makes network requests only to Google: <code>accounts.google.com</code> and <code>oauth2.googleapis.com</code> to sign you in, and <code>gmail.googleapis.com</code> to sync your mail and carry out your actions. It has no telemetry, crash reporting, analytics, or update checks, and there is no Chord server for it to report to.</p>
+        <p>Google’s handling of your mail is covered by the <a href="https://policies.google.com/privacy">Google Privacy Policy</a>.</p>
+      </div>
+    </section>
+
+    <section>
+      <h2 class="label"><b>04</b>What stays on your computer</h2>
+      <div class="prose">
+        <p>Everything Chord stores is in your home directory:</p>
+        <table>
+          <thead><tr><th>Path</th><th>Contents</th></tr></thead>
+          <tbody>
+            <tr><td><code>~/.config/chord-mail/client_secret.json</code></td><td>Your OAuth client</td></tr>
+            <tr><td><code>~/.config/chord-mail/config.toml</code></td><td>Settings</td></tr>
+            <tr><td><code>~/.local/share/chord-mail/token.json</code></td><td>Your sign-in, readable only by you</td></tr>
+            <tr><td><code>~/.local/share/chord-mail/mail.db</code></td><td>A copy of your mail, the action queue, snoozes, and scheduled sends</td></tr>
+            <tr><td><code>~/.cache/chord-mail/drafts/</code></td><td>Drafts while Neovim has them open</td></tr>
+          </tbody>
+        </table>
+        <p>The background service shows desktop notifications for new Primary mail. They are drawn by your desktop and go no further.</p>
+      </div>
+    </section>
+
+    <section>
+      <h2 class="label"><b>05</b>Images in mail</h2>
+      <div class="prose">
+        <p>Chord blocks remote images, fonts, and other remote content in messages by default, so senders can’t use tracking pixels to learn when you open their mail. If you choose to load images for a message or always for a sender, your computer fetches them from the sender’s servers, and those servers can then see your IP address and that you opened the message.</p>
+      </div>
+    </section>
+
+    <section>
+      <h2 class="label"><b>06</b>The installer</h2>
+      <div class="prose">
+        <p>The install command downloads a script from this website. The script installs build tools from your Arch package mirrors, downloads Chord’s source from <a href="https://github.com/thetylerreiff/chord-mail">GitHub</a>, and builds it, which downloads Rust libraries from crates.io. Those services see the requests, as with any download. The script sends nothing about you or your machine anywhere. You can <a href="/install">read it</a> before you run it.</p>
+      </div>
+    </section>
+
+    <section>
+      <h2 class="label"><b>07</b>This website</h2>
+      <div class="prose">
+        <p>This site sets no cookies and runs no analytics or tracking. The demo inbox and keyboard run entirely in your browser, and nothing you press is sent anywhere.</p>
+        <ul>
+          <li>The site is hosted by <a href="https://vercel.com/legal/privacy-policy">Vercel</a>, which keeps standard request logs, such as IP address, browser, and page requested, to serve and protect the site.</li>
+          <li>Its fonts load from <a href="https://policies.google.com/privacy">Google Fonts</a>, so your browser also sends Google a request for them.</li>
+        </ul>
+      </div>
+    </section>
+
+    <section>
+      <h2 class="label"><b>08</b>Removing your data</h2>
+      <div class="prose">
+        <ul>
+          <li><code>chord-mail logout</code> deletes your saved sign-in.</li>
+          <li>To remove everything, also delete the three <code>chord-mail</code> directories listed above.</li>
+          <li>To revoke Chord’s access from Google’s side, remove it at <a href="https://myaccount.google.com/permissions">myaccount.google.com/permissions</a>.</li>
+        </ul>
+        <p>Because Chord’s author never receives your data, there is nothing to delete on our end.</p>
+      </div>
+    </section>
+
+    <section>
+      <h2 class="label"><b>09</b>Changes and contact</h2>
+      <div class="prose">
+        <p>If this policy changes, the new version will be posted here with a new effective date, and every change is visible in the <a href="https://github.com/thetylerreiff/chord-mail/commits/main/site/privacy.html">project’s history</a>. Questions go to the <a href="https://github.com/thetylerreiff/chord-mail/issues">issue tracker</a>.</p>
+      </div>
+    </section>
+  </main>
+
+  <footer class="doc-foot">
+    <p class="label fine">MIT · <a href="https://github.com/thetylerreiff/chord-mail">Source ↗</a> · <a href="/terms">Terms</a> · <a href="/privacy">Privacy</a></p>
+    <p class="label fine">Built by <a href="https://thetylerreiff.co">Tyler Reiff</a></p>
+  </footer>
+</div>
+</body>
+</html>

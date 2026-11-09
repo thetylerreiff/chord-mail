@@ -7,61 +7,57 @@
      dev/cards renders it: ?banner at 1200×400 (2x), ?og at 1200×630. Not part of the site build. -->
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,100..900&family=Martian+Mono:wdth,wght@75..112.5,100..800&display=swap">
 <link rel="stylesheet" href="/src/base.css">
-<link rel="stylesheet" href="/src/chord.css">
+<link rel="stylesheet" href="/src/light.css">
 <style>
   html, body { height: 100%; overflow: hidden; }
-  .hero { height: 100vh; min-height: 0; grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.45fr) minmax(0, 1fr); }
-  .block { padding: 22px 26px; }
-  .key { grid-template-rows: auto 1fr; }
-  .readout { min-height: 0; align-self: end; gap: 2vh; }
-  .glyph { font-size: 58vh; }
-  .verb { font-size: 11vh; }
-  .mail { grid-template-rows: auto 1fr; }
-  .mail .inbox { --row-h: 46px; }
+  .card { height: 100vh; display: grid; grid-template-rows: auto 1fr auto; padding: 0 40px; }
+  .rail { height: 48px; }
+  .rail .label { display: inline; }
+  .stage { display: grid; grid-template-columns: 420px minmax(0, 1fr); gap: 0 48px; align-items: center; padding: 0; }
+  .side { gap: 18px; }
+  .title { font-size: 50px; }
+  .lede { font-size: 16px; max-width: 34ch; }
+  .install code { font-size: 13px; }
+  .fig { gap: 8px; }
+  .inbox { --row-h: 44px; }
   .ib-acct { visibility: hidden; }
-  .ib-label { visibility: hidden; width: 0; }
-  .info { grid-template-rows: auto 1fr auto; }
-  .mark { font-size: 17px; }
-  .mark .ver { font: 500 11px 'Martian Mono', monospace; letter-spacing: 0.06em; color: var(--dim); margin-left: 8px; }
-  .head { font-size: 54px; }
-  .sub { margin: 14px 0 0; color: var(--dim); }
-  .install { display: none; }
-  .tally { display: none; }
+  .word { margin: 0 0 -1px; height: 156px; }
+  .word .display { font-size: 271px; }
 
-  /* The link preview is taller: room for the tally and the install line. */
-  .og .mail { grid-template-rows: auto 1fr; }
-  .og .tally { display: flex; }
-  .og .tally .n { font-size: 150px; }
-  .og .head { font-size: 50px; }
-  .og .verb { font-size: 56px; }
-  .og .install { display: block; padding: 12px 14px; font: 500 13px/1.45 'Martian Mono', monospace; }
+  /* The README banner is shorter: no lede, no install, and the inbox loses its last rows. */
+  .banner .card { grid-template-rows: auto 1fr; }
+  .banner .word, .banner .lede, .banner .install { display: none; }
+  .banner .title { font-size: 52px; }
+  .banner .stage { padding-block: 20px; }
+  .banner .inbox { --row-h: 40px; }
+  .banner .ib-row:nth-child(n + 5) { display: none; }
 </style>
 </head>
 <body>
-<section class="hero">
-  <div class="block key">
-    <div class="key-top label"><span>Press</span><span></span></div>
-    <div class="readout">
-      <span class="glyph display">e</span>
-      <span class="verb display">Done</span>
+<div class="card">
+  <header class="rail">
+    <span class="label">Chord · keyboard-driven Gmail for Omarchy</span>
+    <span class="label">chord.thetylerreiff.co</span>
+  </header>
+  <main class="stage">
+    <div class="side">
+      <h1 class="title">Mail at the speed of a keypress.</h1>
+      <p class="lede">Every action is one key. The window reads a local cache, so it never waits on the network.</p>
+      <div class="install">
+        <p class="install-top label">Install · Arch / Omarchy</p>
+        <code><span>curl -fsSL https://</span><span>chord.thetylerreiff.co/install | bash</span></code>
+      </div>
     </div>
-  </div>
-  <div class="block mail">
-    <div class="inbox" id="inbox"></div>
-    <p class="tally"><span class="display n">5</span><span class="label">threads left in Primary</span></p>
-  </div>
-  <div class="block info">
-    <div class="mark">CHORD<span class="ver">0.1.0</span></div>
-    <div style="align-self: end">
-      <h1 class="display head">Mail at the speed of a keypress.</h1>
-      <p class="label sub">Keyboard-driven Gmail for Omarchy</p>
-    </div>
-    <code class="install">chord.thetylerreiff.co</code>
-  </div>
-</section>
+    <figure class="fig">
+      <figcaption class="label"><span>Fig. 01 — The inbox, working</span><span>j k e h # z</span></figcaption>
+      <div class="inbox" id="inbox"></div>
+    </figure>
+  </main>
+  <div class="word" aria-hidden="true"><span class="display">Chord</span></div>
+</div>
 <script type="module">
   import { mountInbox } from '/src/inbox.js';
-  document.body.classList.toggle('og', location.search.includes('og'));
+  document.body.classList.toggle('banner', location.search.includes('banner'));
   mountInbox(document.getElementById('inbox'), { listen: false, toggle: false });
 </script>
 </body>

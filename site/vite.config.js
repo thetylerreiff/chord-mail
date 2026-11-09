@@ -2,7 +2,7 @@ import { readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { defineConfig } from 'vite';
 
-// One page, plus the installer at /install as plain text (vercel.json does the same in production).
+// The page, Terms and Privacy, plus the installer at /install as plain text (vercel.json does the same in production).
 const installer = {
   name: 'installer',
   configureServer(server) {
@@ -20,7 +20,17 @@ async function serveInstaller(req, res, next) {
 }
 
 export default defineConfig({
+  appType: 'mpa',
   plugins: [installer],
+  build: {
+    rolldownOptions: {
+      input: {
+        main: resolve(import.meta.dirname, 'index.html'),
+        terms: resolve(import.meta.dirname, 'terms.html'),
+        privacy: resolve(import.meta.dirname, 'privacy.html'),
+      },
+    },
+  },
   server: { port: 4173 },
   preview: { port: 4173 },
 });
