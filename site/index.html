@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Chord: keyboard-driven Gmail for Omarchy</title>
 <meta name="description" content="A Gmail client for Omarchy that lives on your keyboard. Fast, focused, and local-first. Free and open source.">
-<meta name="theme-color" content="#ebe8df">
+<meta name="theme-color" content="#eff0ed">
 <meta property="og:type" content="website">
 <meta property="og:url" content="https://chord.thetylerreiff.co/">
 <meta property="og:title" content="Chord: keyboard-driven Gmail for Omarchy">
@@ -17,57 +17,61 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,100..900&family=Martian+Mono:wdth,wght@75..112.5,100..800&display=swap">
 <link rel="stylesheet" href="/src/base.css">
-<link rel="stylesheet" href="/src/chord.css">
+<link rel="stylesheet" href="/src/light.css">
 </head>
 <body>
-<section class="hero" aria-label="Chord">
-  <div class="block key">
-    <div class="key-top label"><a class="mark" href="/">CHORD</a><span>0.1.0</span></div>
-    <div class="readout" aria-hidden="true">
-      <span class="label" id="key-label">Press</span>
-      <span class="glyph display" id="glyph">e</span>
-      <span class="verb display" id="verb">Done</span>
-    </div>
-    <a class="down label" href="#keys">Every key, drawn <span aria-hidden="true">↓</span></a>
-  </div>
-
-  <div class="block mail">
-    <div class="mail-top label">
-      <span>Fig. 01 — The inbox, working</span>
-      <button type="button" class="keys-toggle" aria-pressed="true" aria-label="Keys">Keys</button>
-    </div>
-    <div class="inbox" id="inbox"></div>
-    <p class="tally"><span class="display n" id="left">5</span><span class="label" id="left-label">threads left in Primary</span></p>
-  </div>
-
-  <div class="block info">
-    <nav class="nav label" aria-label="Site">
-      <a class="mark phone-mark" href="/">CHORD <span class="ver">0.1.0</span></a>
-      <a href="https://github.com/thetylerreiff/chord-mail">GitHub ↗</a>
+<div class="page">
+  <header class="rail">
+    <span class="label">Chord · keyboard-driven Gmail for Omarchy</span>
+    <nav class="nav" aria-label="Site">
+      <a href="#install">Install</a>
+      <a href="#keys" class="down">Keymap ↓</a>
       <a href="https://github.com/thetylerreiff/chord-mail#connect-gmail">Connect Gmail ↗</a>
+      <a href="https://github.com/thetylerreiff/chord-mail">GitHub ↗</a>
     </nav>
-    <h1 class="display head">Mail at the speed of a keypress.</h1>
-    <p class="lede">A Gmail client for Omarchy that lives on your keyboard. It reads only from a local cache, so it never waits on the network.</p>
-    <ul class="facts label">
-      <li>Cache <span>SQLite, local, offline</span></li>
-      <li>Compose <span>Neovim</span></li>
-      <li>Theme <span>follows Omarchy</span></li>
-      <li>Sign-in <span>your own OAuth client</span></li>
-      <li>CLI <span>--json</span></li>
-      <li>License <span>MIT</span></li>
-    </ul>
-    <div class="install" id="install">
-      <div class="label install-top"><span>Install · Arch / Omarchy</span><a href="/install">Script ↗</a></div>
-      <code id="cmd">curl -fsSL https://<wbr>chord.thetylerreiff.co/<wbr><span class="nb">install | bash</span></code>
-      <button type="button" id="copy" class="label"><span data-label>Copy</span></button>
-    </div>
-  </div>
-</section>
+  </header>
+
+  <main class="stage">
+    <ol class="notes label" aria-label="Callouts">
+      <li class="n1"><b>01</b> Split inbox from Gmail's own categories</li>
+      <li class="n2"><b>02</b> Selected. <kbd>e</kbd> marks it done, at once</li>
+      <li class="n3"><b>03</b> Every action is one key. <kbd>z</kbd> undoes it</li>
+    </ol>
+
+    <figure class="fig">
+      <figcaption class="label"><span>Fig. 01 — The inbox, working</span><span class="try">Try it: j k e h # z <button type="button" class="keys-toggle" aria-pressed="true" aria-label="Keyboard shortcuts">Keys</button></span></figcaption>
+      <div class="inbox" id="inbox"></div>
+    </figure>
+
+    <aside class="side">
+      <h1 class="title">Mail at the speed of a keypress.</h1>
+      <p class="lede">The window reads only from a local cache, so it never waits on the network. Gmail catches up in the background.</p>
+      <dl class="spec label">
+        <div><dt>Rev</dt><dd>0.1.0</dd></div>
+        <div><dt>Target</dt><dd>Omarchy / Arch</dd></div>
+        <div><dt>Arch</dt><dd>x86_64 · aarch64</dd></div>
+        <div><dt>Compose</dt><dd>Neovim</dd></div>
+        <div><dt>Cache</dt><dd>SQLite, local</dd></div>
+        <div><dt>License</dt><dd>MIT</dd></div>
+      </dl>
+      <div class="install" id="install">
+        <p class="install-top label">Install · Arch / Omarchy</p>
+        <code id="cmd"><span>curl -fsSL https://</span><span>chord.thetylerreiff.co/install | bash</span></code>
+        <div class="install-foot">
+          <button type="button" id="copy" class="label"><span data-label>Copy</span></button>
+          <a class="label" href="/install">Read the script ↗</a>
+        </div>
+      </div>
+    </aside>
+  </main>
+
+  <div class="word" aria-hidden="true"><span class="display">Chord</span></div>
+</div>
 
 <section class="plate" id="keys" aria-labelledby="keys-h">
   <header class="plate-top">
     <h2 class="label" id="keys-h">Fig. 02 — The keymap</h2>
-    <p class="label hint">Every black key does something in Chord. <span class="kb">Press one.</span><span class="touch">Tap one.</span> <button type="button" class="keys-toggle" aria-pressed="true" aria-label="Keys">Keys</button></p>
+    <p class="label hint">Every black key does something in Chord. <span class="kb">Press one.</span><span class="touch">Tap one.</span> <button type="button" class="keys-toggle" aria-pressed="true" aria-label="Keyboard shortcuts">Keys</button></p>
   </header>
   <p class="label pan">Drag to see every key ↔</p>
   <div class="board-wrap" id="board-wrap">
@@ -84,6 +88,6 @@
     </div>
   </footer>
 </section>
-<script type="module" src="/src/chord.js"></script>
+<script type="module" src="/src/light.js"></script>
 </body>
 </html>

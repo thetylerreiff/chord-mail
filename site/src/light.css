@@ -1,0 +1,160 @@
+/* A: light. A technical figure on cool white; CHORD bleeds across the bottom. */
+:root {
+  --ground: #eff0ed;
+  --ink: #111213;
+  --dim: #6b6c69;
+  --rule: #c9cac5;
+  --signal: #ff5b1f;
+  --panel: #ffffff;
+  --panel-ink: #111213;
+  --panel-dim: #7a7b77;
+  --panel-rule: #dcdcd7;
+  --sel-bg: #f3f3f0;
+  --gutter: clamp(16px, 2.6vw, 40px);
+  color-scheme: light;
+}
+.page {
+  min-height: 100svh;
+  display: grid;
+  grid-template-rows: auto 1fr auto;
+  grid-template-columns: minmax(0, 1fr);
+  padding: 0 var(--gutter);
+  overflow: hidden;
+}
+.rail {
+  display: flex; justify-content: space-between; align-items: center;
+  height: 52px; border-bottom: 1px solid var(--ink);
+}
+.nav { display: flex; height: 100%; }
+.nav a { display: grid; place-items: center; padding: 0 16px; border-left: 1px solid var(--rule); text-decoration: none; font-size: 13.5px; }
+.nav a:hover { color: var(--signal); }
+
+.stage {
+  display: grid;
+  grid-template-columns: 236px minmax(0, 1fr) 360px;
+  gap: 0 28px; align-items: center;
+  padding-block: clamp(16px, 3vh, 32px);
+}
+
+/* Callouts on hairlines, pointing into the figure. Offsets match the inbox:
+   caption 26px, header 45px, rows 46px. */
+.notes { list-style: none; margin: 0; padding: 0; position: relative; height: 100%; min-height: 360px; }
+.notes li { position: absolute; left: 0; right: -28px; display: flex; gap: 8px; align-items: baseline; padding-right: 0; }
+.notes li::after { content: ''; flex: 1; min-width: 24px; height: 1px; background: var(--ink); align-self: center; }
+.notes b { color: var(--signal); font-weight: 500; }
+.notes kbd { height: 17px; min-width: 17px; font-size: 10px; }
+.n1 { top: calc(50% - 141px); }
+.n2 { top: calc(50% - 101px); }
+.n3 { top: calc(50% + 140px); }
+
+.fig { margin: 0; display: grid; gap: 8px; min-width: 0; }
+.fig figcaption { display: flex; justify-content: space-between; }
+.inbox { box-shadow: 0 1px 0 var(--rule), 0 24px 48px -32px rgb(0 0 0 / 0.25); }
+
+.side { display: grid; gap: 16px; align-content: center; }
+.title { margin: 0; font-weight: 800; font-variation-settings: 'wdth' 125; text-transform: uppercase; font-size: 30px; line-height: 0.92; letter-spacing: -0.015em; }
+.lede { margin: 0; font-size: 14.5px; color: #3c3d3b; }
+.spec { margin: 0; display: grid; grid-template-columns: 1fr 1fr; border-top: 1px solid var(--ink); }
+.spec div { padding: 6px 0; border-bottom: 1px solid var(--rule); }
+.spec div:nth-child(odd) { padding-right: 10px; }
+.spec dt { color: var(--dim); }
+.spec dd { margin: 1px 0 0; }
+/* One orange slab: label, the command on two deliberate lines, then a hairline and the actions. */
+.install { background: var(--signal); color: var(--ink); padding: 14px 16px 12px; display: grid; gap: 10px; }
+.install-top { margin: 0; }
+.install code { display: grid; font: 500 12px/1.5 'Martian Mono', monospace; letter-spacing: -0.01em; }
+.install code span { white-space: nowrap; }
+.install-foot {
+  display: flex; justify-content: space-between; align-items: center;
+  padding-top: 10px; border-top: 1px solid rgb(17 18 19 / 0.25);
+}
+.install-foot button { background: var(--ink); color: #fff; border: 0; padding: 8px 14px; cursor: pointer; }
+.install-foot button:hover { background: #fff; color: var(--ink); }
+.install-foot a { text-decoration: none; }
+.install-foot a:hover { text-decoration: underline; text-underline-offset: 3px; }
+
+.word { border-top: 1px solid var(--ink); line-height: 0; margin-bottom: -2.2vw; min-width: 0; overflow: hidden; }
+.word .display { display: block; font-size: 22.6vw; line-height: 0.82; margin-left: -0.05em; letter-spacing: -0.035em; color: var(--ink); white-space: nowrap; }
+
+@media (max-width: 1100px) {
+  .stage { grid-template-columns: minmax(0, 1fr); gap: 24px; }
+  .notes { display: none; }
+  .rail .label { display: none; }
+}
+
+/* --- The keymap plate, on A's ground ------------------------------------- */
+:root { --paper: var(--ground); }
+.fig .try { display: inline-flex; align-items: center; gap: 10px; }
+.keys-toggle {
+  background: none; border: 1px solid currentColor; padding: 3px 7px; cursor: pointer;
+  font: 500 10px 'Martian Mono', monospace; text-transform: uppercase; letter-spacing: 0.04em; color: inherit;
+}
+.keys-toggle::after { content: ' on'; }
+.keys-toggle[aria-pressed='false']::after { content: ' off'; }
+.keys-toggle[aria-pressed='false'] { opacity: 0.7; }
+/* Touch devices have no keys to switch off; a tablet with a keyboard gets the switch once a key acts. */
+@media (hover: none) and (pointer: coarse) {
+  .keys-toggle { display: none; }
+  .keyed .keys-toggle { display: inline-block; }
+}
+
+.plate {
+  min-height: 100svh;
+  background: var(--paper); color: var(--ink);
+  display: grid; grid-template-rows: auto auto 1fr auto; gap: 16px;
+  padding: var(--gutter);
+  border-top: 1px solid var(--ink);
+}
+.plate-top { display: flex; justify-content: space-between; align-items: baseline; gap: 16px; flex-wrap: wrap; }
+.plate-top h2 { margin: 0; color: var(--ink); }
+.hint { margin: 0; color: var(--dim); display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.hint .touch { display: none; }
+@media (hover: none) and (pointer: coarse) { .hint .kb { display: none; } .hint .touch { display: inline; } }
+.board-wrap { display: grid; place-items: center; min-height: 0; }
+.pan { display: none; margin: 0; color: var(--dim); }
+.board-svg { width: min(100%, 1180px); height: auto; max-height: 66svh; overflow: visible; }
+.board-svg .case { fill: none; stroke: var(--ink); stroke-width: 1; }
+.cap rect { fill: var(--paper); stroke: var(--ink); stroke-width: 1; }
+.cap text { font: 500 13px 'Martian Mono', monospace; fill: var(--ink); pointer-events: none; }
+.cap text.mod { font-size: 9.5px; letter-spacing: 0.04em; }
+.cap.bound rect { fill: var(--ink); }
+.cap.bound text { fill: var(--paper); }
+.cap.hot rect { fill: var(--signal); stroke: var(--signal); }
+.cap.hot text { fill: var(--ink); }
+.cap.bound { cursor: pointer; }
+.cap { transition: transform 0.12s cubic-bezier(0.2, 0, 0, 1); }
+.cap.down { transform: translateY(3px); }
+.cap.down rect { fill: var(--signal); stroke: var(--signal); }
+.cap.down text { fill: var(--ink); }
+.notes line, .notes polyline { stroke: var(--ink); stroke-width: 1; fill: none; }
+.notes circle { fill: var(--ink); stroke: var(--paper); stroke-width: 1.5; }
+.notes text { font: 500 11px 'Martian Mono', monospace; letter-spacing: 0.04em; fill: var(--ink); text-transform: uppercase; }
+
+.plate-foot { display: grid; grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr); gap: 32px; align-items: end; }
+.say { margin: 0; font: 700 clamp(26px, 3vw, 46px)/1.05 'Archivo', sans-serif; font-variation-settings: 'wdth' 125; letter-spacing: -0.035em; min-height: 2em; display: flex; align-items: flex-end; }
+.say b { font-weight: 800; color: var(--ink); background: var(--signal); padding: 0 0.14em; margin-right: 0.3em; }
+.end { display: grid; gap: 8px; min-width: 0; }
+.end-install { display: flex; border: 1px solid var(--ink); min-width: 0; background: var(--panel); }
+.end-install code { flex: 1; min-width: 0; padding: 11px 12px; font: 500 12px/1.4 'Martian Mono', monospace; }
+.end-install button { background: var(--ink); color: var(--panel); border: 0; padding: 0 16px; cursor: pointer; }
+.end-install button:hover { background: var(--signal); color: var(--ink); }
+.fine { margin: 0; color: var(--dim); }
+.fine a { text-decoration: none; color: var(--ink); }
+.fine a:hover { color: var(--signal); }
+
+@media (max-width: 1080px) {
+  .plate-foot { grid-template-columns: minmax(0, 1fr); }
+  .plate { min-height: auto; }
+}
+/* Phones: the plate keeps a readable size and pans sideways. */
+@media (max-width: 760px) {
+  .pan { display: block; }
+  .board-wrap { -webkit-mask-image: linear-gradient(90deg, transparent, #000 28px, #000 calc(100% - 28px), transparent); mask-image: linear-gradient(90deg, transparent, #000 28px, #000 calc(100% - 28px), transparent); }
+  .board-wrap { overflow-x: auto; justify-items: start; margin-inline: calc(var(--gutter) * -1); padding-inline: var(--gutter); scroll-snap-type: x proximity; }
+  .board-svg { width: 780px; max-width: none; max-height: none; }
+}
+
+/* The narrowest phones: keep the command's second line unbroken. */
+@media (max-width: 380px) {
+  .install code { font-size: 11px; }
+}
