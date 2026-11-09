@@ -14,7 +14,7 @@ const ROWS = [
 
 // Every action, from the README's key tables: the cap it presses, a short verb for the big
 // readout, and what it does. Shifted actions are their own entries (E is Shift+E).
-export const ACTS = {
+const ACTS = {
   j: { cap: 'j', verb: 'Next', does: 'next conversation' },
   k: { cap: 'k', verb: 'Previous', does: 'previous conversation' },
   enter: { cap: 'enter', verb: 'Open', does: 'opens the conversation' },
@@ -81,7 +81,7 @@ const el = (name, attrs = {}, text) => {
   return n;
 };
 
-export function drawKeyboard(svg) {
+function drawKeyboard(svg) {
   const width = 15 * U;
   const height = 5 * U;
   const BAND = 92; // room for two tiers of labels above and below

@@ -58,7 +58,7 @@
 <script type="module">
   import { mountInbox } from '/src/inbox.js';
   document.body.classList.toggle('banner', location.search.includes('banner'));
-  mountInbox(document.getElementById('inbox'), { listen: false, toggle: false });
+  mountInbox(document.getElementById('inbox'));
 </script>
 </body>
 </html>

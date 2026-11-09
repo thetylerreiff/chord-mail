@@ -5,7 +5,7 @@ import { mountKeymap, plateKey } from './keymap.js';
 
 const $ = (id) => document.getElementById(id);
 // A tap on one of the inbox's own buttons always counts: a button you can tap is on screen.
-const inbox = mountInbox($('inbox'), { listen: false, toggle: false, onKey: (key) => run(key, true) });
+const inbox = mountInbox($('inbox'), { onKey: (key) => run(key, true) });
 // The plate's resting line, worded for the device in hand.
 if (matchMedia('(hover: none) and (pointer: coarse)').matches) $('readout').textContent = 'tap any black key.';
 const press = mountKeymap($('board'), $('readout'));

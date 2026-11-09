@@ -1,7 +1,6 @@
 // A working miniature of Chord's inbox, driven by Chord's own keys: j/k move, e done, h snooze,
 // # trash, s star, z undo. The mail is dev/seed-demo.py's invented inbox, split the way Chord
-// splits it (Primary, Updates, Promotions). Every action fires "chord:action"; every change fires
-// "chord:count" with the split and how many threads are left in it.
+// splits it (Primary, Updates, Promotions).
 
 const MAIL = [
   { split: 'primary', from: 'Ada Lovelace', subject: 'Engine notes, draft 3', snippet: "Here's where the Analytical Engine notes stand.", label: 'Projects/Chord', time: '9:10', unread: true },
@@ -19,14 +18,11 @@ const SPLITS = [
   ['promotions', 'Promotions'],
 ];
 
-const VERBS = {
-  e: { verb: 'Done', toast: 'Done. z to undo' },
-  h: { verb: 'Snoozed', toast: 'Snoozed until tomorrow, 8:00. z to undo' },
-  '#': { verb: 'Trash', toast: 'Moved to Trash. z to undo' },
-  s: { verb: 'Starred', toast: 'Starred' },
-  z: { verb: 'Undone', toast: 'Undone' },
-  j: { verb: 'Next' },
-  k: { verb: 'Previous' },
+const TOASTS = {
+  e: 'Done. z to undo',
+  h: 'Snoozed until tomorrow, 8:00. z to undo',
+  '#': 'Moved to Trash. z to undo',
+  z: 'Undone',
 };
 
 const esc = (s) => s.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
@@ -35,12 +31,11 @@ const fresh = () => MAIL.map((m, i) => ({ ...m, id: i }));
 
 // onKey: when given, the inbox's own key buttons call it instead of acting directly, so the page
 // can run them through the same path as the keyboard.
-export function mountInbox(root, { listen = true, toggle: showToggle = true, onKey } = {}) {
+export function mountInbox(root, { onKey } = {}) {
   let all = fresh();
   let split = 'primary';
   let sel = 0;
   const undo = [];
-  let keysOn = true;
   const rows = () => all.filter((r) => r.split === split);
 
   root.innerHTML = `
@@ -61,14 +56,12 @@ export function mountInbox(root, { listen = true, toggle: showToggle = true, onK
         <button type="button" data-key="#"><kbd>#</kbd><span>trash</span></button>
         <button type="button" data-key="z"><kbd>z</kbd><span>undo</span></button>
       </div>
-      ${showToggle ? '<button type="button" class="ib-toggle" aria-pressed="true" data-toggle>Keys on</button>' : ''}
     </div>
     <p class="ib-toast" role="status" aria-live="polite"></p>`;
 
   const list = root.querySelector('.ib-list');
   const zero = root.querySelector('.ib-zero');
   const toast = root.querySelector('.ib-toast');
-  const toggle = root.querySelector('[data-toggle]');
   let toastTimer;
 
   function render() {
@@ -95,7 +88,6 @@ export function mountInbox(root, { listen = true, toggle: showToggle = true, onK
     // Inbox zero only when every split is empty; otherwise just this one is clear.
     zero.querySelector('[data-zero]').textContent = all.length ? `${SPLITS.find(([id]) => id === split)[1]} clear.` : 'Inbox zero.';
     list.hidden = rs.length === 0;
-    root.dispatchEvent(new CustomEvent('chord:count', { bubbles: true, detail: { split, left: rs.length, unread: rs.filter((r) => r.unread).length } }));
   }
 
   function say(text) {
@@ -103,10 +95,6 @@ export function mountInbox(root, { listen = true, toggle: showToggle = true, onK
     toast.classList.add('on');
     clearTimeout(toastTimer);
     toastTimer = setTimeout(() => toast.classList.remove('on'), 2200);
-  }
-
-  function emit(key) {
-    root.dispatchEvent(new CustomEvent('chord:action', { bubbles: true, detail: { key, verb: VERBS[key]?.verb ?? '' } }));
   }
 
   // The row leaves, then the list closes the gap, as in Chord. Each step waits for its animation
@@ -133,8 +121,7 @@ export function mountInbox(root, { listen = true, toggle: showToggle = true, onK
     if (key === 'j' || key === 'k') {
       if (!rs.length) return;
       sel = Math.max(0, Math.min(rs.length - 1, sel + (key === 'j' ? 1 : -1)));
-      render();
-      return emit(key);
+      return render();
     }
     if (key === 'z') {
       const last = undo.pop();
@@ -143,19 +130,16 @@ export function mountInbox(root, { listen = true, toggle: showToggle = true, onK
       all.splice(last.at, 0, last.row);
       sel = rows().indexOf(last.row);
       render();
-      say(VERBS.z.toast);
-      return emit('z');
+      return say(TOASTS.z);
     }
     if (!rs.length) return;
     const row = rs[sel];
     if (key === 's') {
       row.starred = !row.starred;
       render();
-      say(row.starred ? 'Starred' : 'Unstarred');
-      return emit('s');
+      return say(row.starred ? 'Starred' : 'Unstarred');
     }
     if (key === 'e' || key === 'h' || key === '#') {
-      emit(key);
       await leave(sel);
       const at = all.indexOf(row);
       all.splice(at, 1);
@@ -163,7 +147,7 @@ export function mountInbox(root, { listen = true, toggle: showToggle = true, onK
       sel = Math.max(0, Math.min(sel, rows().length - 1));
       render();
       // At inbox zero the panel itself says so; no toast on top.
-      if (rows().length) say(VERBS[key].toast);
+      if (rows().length) say(TOASTS[key]);
       else toast.classList.remove('on');
     }
   }
@@ -188,27 +172,12 @@ export function mountInbox(root, { listen = true, toggle: showToggle = true, onK
       sel = 0;
       return render();
     }
-    if (ev.target.closest('[data-toggle]')) {
-      keysOn = !keysOn;
-      toggle?.setAttribute('aria-pressed', String(keysOn));
-      if (toggle) toggle.textContent = keysOn ? 'Keys on' : 'Keys off';
-      return;
-    }
     const li = ev.target.closest('.ib-row');
     if (li) {
       sel = [...list.children].indexOf(li);
       render();
     }
   });
-
-  if (listen)
-    addEventListener('keydown', (ev) => {
-      if (!keysOn || ev.ctrlKey || ev.metaKey || ev.altKey || ev.repeat) return;
-      if (ev.target.closest('input, textarea, select, [contenteditable]')) return;
-      if (!['j', 'k', 'e', 'h', '#', 's', 'z'].includes(ev.key)) return;
-      ev.preventDefault();
-      act(ev.key);
-    });
 
   render();
   // Counts that include queued removals, so the page's readout tells the truth before they land.
