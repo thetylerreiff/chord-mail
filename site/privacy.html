@@ -56,7 +56,7 @@
     <section>
       <h2 class="label"><b>02</b>Your Google account</h2>
       <div class="prose">
-        <p>Chord connects to Gmail through an OAuth client that <em>you</em> create in your own Google Cloud project. Google issues your sign-in to that client, on your computer. It is never sent to Chord’s author or to anyone else.</p>
+        <p>Chord signs in to Gmail through its own Google app, which is built into Chord’s release packages, or through an OAuth client you create in your own Google Cloud project, if you’d rather. Either way, Google issues your sign-in to the app on your computer, and it is never sent to Chord’s author or to anyone else. Chord’s Google app identifies the app to Google; it gives its author no access to your account.</p>
         <p>Chord asks Google for one permission, the <code>gmail.modify</code> scope. It lets Chord read your mail and labels, and label, archive, trash, and send mail on your behalf. It can’t permanently delete mail, and it can’t touch anything in your Google account outside Gmail.</p>
         <p>Chord uses this access only to show you your mail and to carry out the actions you take. Its use of information received from Google APIs adheres to the <a href="https://developers.google.com/terms/api-services-user-data-policy">Google API Services User Data Policy</a>, including the Limited Use requirements. Chord never transfers your Google data to anyone, never uses it for advertising, and never sells it.</p>
       </div>
@@ -73,11 +73,11 @@
     <section>
       <h2 class="label"><b>04</b>What stays on your computer</h2>
       <div class="prose">
-        <p>Everything Chord stores is in your home directory:</p>
+        <p>Everything Chord stores is in your home directory, in folders only your user account can open:</p>
         <table>
           <thead><tr><th>Path</th><th>Contents</th></tr></thead>
           <tbody>
-            <tr><td><code>~/.config/chord-mail/client_secret.json</code></td><td>Your OAuth client</td></tr>
+            <tr><td><code>~/.config/chord-mail/client_secret.json</code></td><td>Your own OAuth client, if you use one</td></tr>
             <tr><td><code>~/.config/chord-mail/config.toml</code></td><td>Settings</td></tr>
             <tr><td><code>~/.local/share/chord-mail/token.json</code></td><td>Your sign-in, readable only by you</td></tr>
             <tr><td><code>~/.local/share/chord-mail/mail.db</code></td><td>A copy of your mail, the action queue, snoozes, and scheduled sends</td></tr>
@@ -98,7 +98,7 @@
     <section>
       <h2 class="label"><b>06</b>The installer</h2>
       <div class="prose">
-        <p>The install command downloads a script from this website. The script installs build tools from your Arch package mirrors, downloads Chord’s source from <a href="https://github.com/thetylerreiff/chord-mail">GitHub</a>, and builds it, which downloads Rust libraries from crates.io. Those services see the requests, as with any download. The script sends nothing about you or your machine anywhere. You can <a href="/install">read it</a> before you run it.</p>
+        <p>The install command downloads a script from this website. The script downloads Chord’s release package from <a href="https://github.com/thetylerreiff/chord-mail/releases">GitHub</a> and installs it, with its dependencies from your Arch package mirrors. Where there’s no package, it downloads Chord’s source from GitHub instead and builds it, which downloads Rust libraries from crates.io. Those services see the requests, as with any download. The script sends nothing about you or your machine anywhere. You can <a href="/install">read it</a> before you run it.</p>
       </div>
     </section>
 
