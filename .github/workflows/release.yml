@@ -1,0 +1,140 @@
+name: Release
+
+# A version tag (v0.1.0) builds the Arch package with Chord's Google OAuth
+# client compiled in and publishes it as a GitHub Release, which the installer
+# downloads. The client comes from the repository secrets CHORD_GOOGLE_CLIENT_ID
+# and CHORD_GOOGLE_CLIENT_SECRET and is never in the source: Google's API terms
+# keep developer credentials out of open-source code. Every other build (CI,
+# bin/install, cargo build) has no built-in client and uses your own.
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    container: archlinux:latest
+    env:
+      CARGO_TERM_COLOR: always
+      QT_QPA_PLATFORM: offscreen
+      CHORD_GOOGLE_CLIENT_ID: ${{ secrets.CHORD_GOOGLE_CLIENT_ID }}
+      CHORD_GOOGLE_CLIENT_SECRET: ${{ secrets.CHORD_GOOGLE_CLIENT_SECRET }}
+    steps:
+      - name: Check the Google client secrets are set
+        run: |
+          if [ -z "$CHORD_GOOGLE_CLIENT_ID" ] || [ -z "$CHORD_GOOGLE_CLIENT_SECRET" ]; then
+            echo "::error::Set the CHORD_GOOGLE_CLIENT_ID and CHORD_GOOGLE_CLIENT_SECRET repository secrets first."
+            exit 1
+          fi
+          case $CHORD_GOOGLE_CLIENT_ID in
+            *.apps.googleusercontent.com) ;;
+            *) echo "::error::CHORD_GOOGLE_CLIENT_ID isn't a Google OAuth client ID."; exit 1 ;;
+          esac
+          case $CHORD_GOOGLE_CLIENT_SECRET in
+            GOCSPX-*) ;;
+            *) echo "::error::CHORD_GOOGLE_CLIENT_SECRET isn't a Google OAuth client secret."; exit 1 ;;
+          esac
+
+      - name: Install build dependencies
+        run: >-
+          pacman -Syu --noconfirm --needed
+          base-devel git lld rust github-cli
+          qt6-base qt6-declarative qt6-webengine qt6-wayland
+          neovim xdg-terminal-exec xdg-utils libnotify
+
+      # No cache step anywhere in this workflow: cargo's fingerprint files under
+      # target/ record the env values, so a cache would store the secret.
+      # Full history, so the next step can tell whether the tag is on main.
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      # Only releases cut from main get the Google client compiled in.
+      # The checkout belongs to another user than root, so git needs this first.
+      - name: Check the tag is on main
+        run: |
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
+          git fetch origin main
+          if ! git merge-base --is-ancestor "$GITHUB_SHA" origin/main; then
+            echo "::error::Tag $GITHUB_REF_NAME isn't on main. Merge the commit into main and tag it there."
+            exit 1
+          fi
+
+      - name: Check the tag matches the version
+        run: |
+          tag=${GITHUB_REF_NAME#v}
+          pkgver=$(sed -n 's/^pkgver=//p' pkgbuild/PKGBUILD)
+          cargo=$(sed -n 's/^version = "\(.*\)"/\1/p' Cargo.toml | head -1)
+          if [ "$tag" != "$pkgver" ] || [ "$tag" != "$cargo" ]; then
+            echo "::error::Tag v$tag doesn't match PKGBUILD ($pkgver) and Cargo.toml ($cargo)."
+            exit 1
+          fi
+          # The lockfile records each workspace crate's version; a forgotten
+          # refresh would otherwise fail deep in the --locked build.
+          for crate in chord-mail chord-core; do
+            locked=$(awk -v n="name = \"$crate\"" '$0 == n { getline; print; exit }' Cargo.lock | sed -n 's/^version = "\(.*\)"/\1/p')
+            if [ "$tag" != "$locked" ]; then
+              echo "::error::Cargo.lock has $crate at '${locked:-nothing}', not $tag. Run cargo update --workspace and commit Cargo.lock."
+              exit 1
+            fi
+          done
+
+      # makepkg won't run as root, and it builds from this checkout.
+      - name: Create the build user
+        run: |
+          useradd -m builder
+          chown -R builder: "$GITHUB_WORKSPACE"
+
+      - name: Check formatting and lints
+        run: |
+          sudo -u builder --preserve-env=CARGO_TERM_COLOR cargo fmt --all --check
+          sudo -u builder --preserve-env=CARGO_TERM_COLOR cargo clippy --workspace --all-targets --locked -- -D warnings
+
+      - name: Build and test the package
+        run: |
+          cd pkgbuild
+          sudo -u builder --preserve-env=CHORD_GOOGLE_CLIENT_ID,CHORD_GOOGLE_CLIENT_SECRET,CARGO_TERM_COLOR,QT_QPA_PLATFORM \
+            makepkg -f --noconfirm
+
+      # Check the binary that ships, not target/release. The secrets go to grep
+      # through process substitution so they aren't on a command line.
+      - name: Check the packaged binary
+        run: |
+          pkg=$(ls pkgbuild/chord-mail-*-x86_64.pkg.tar.zst)
+          tmp=$(mktemp -d)
+          tar --zstd -xf "$pkg" -C "$tmp" usr/bin/chord-mail
+          bin=$tmp/usr/bin/chord-mail
+          grep -qF -f <(printf %s "$CHORD_GOOGLE_CLIENT_ID") "$bin" \
+            || { echo "::error::The packaged binary has no built-in Google client ID."; exit 1; }
+          grep -qF -f <(printf %s "$CHORD_GOOGLE_CLIENT_SECRET") "$bin" \
+            || { echo "::error::The packaged binary has no built-in Google client secret."; exit 1; }
+          out=$("$bin" --version)
+          echo "$out"
+          case $out in
+            *"${GITHUB_REF_NAME#v}"*) ;;
+            *) echo "::error::The packaged binary doesn't report version ${GITHUB_REF_NAME#v}."; exit 1 ;;
+          esac
+
+      # Fixed names, so the installer can always fetch releases/latest/download/<name>.
+      # The release stays a draft until the uploaded package is downloaded back
+      # and matches its checksum, so a failure never leaves a broken "latest".
+      - name: Publish the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
+          mkdir dist
+          mv pkgbuild/chord-mail-*-x86_64.pkg.tar.zst dist/chord-mail-x86_64.pkg.tar.zst
+          (cd dist && sha256sum chord-mail-x86_64.pkg.tar.zst > chord-mail-x86_64.pkg.tar.zst.sha256)
+          gh release create "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --verify-tag --draft \
+            --title "Chord ${GITHUB_REF_NAME#v}" --generate-notes
+          gh release upload "$GITHUB_REF_NAME" dist/* --repo "$GITHUB_REPOSITORY"
+          mkdir check
+          gh release download "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --dir check \
+            --pattern chord-mail-x86_64.pkg.tar.zst --pattern chord-mail-x86_64.pkg.tar.zst.sha256
+          (cd check && sha256sum --check chord-mail-x86_64.pkg.tar.zst.sha256)
+          gh release edit "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --draft=false

@@ -30,6 +30,30 @@ check() {
 
 package() {
   cd "$startdir/.."
+
+  # The binary links whatever Qt, glibc and libstdc++ this machine has, and
+  # Qt versions its symbols per minor release, so an unversioned depends lets
+  # pacman install Chord on an older system where it then won't start. Raise
+  # each floor to what was installed at build time (the QML needs Qt 6.9 at
+  # least). The array above stays the unversioned baseline; entries are
+  # replaced here, not appended, so no name is listed twice.
+  local dep name ver floor pinned=()
+  for dep in "${depends[@]}"; do
+    name=$dep
+    case $name in
+      qt6-base|qt6-declarative|qt6-webengine|qt6-wayland)
+        ver=$(pacman -Q "$name" | cut -d' ' -f2); ver=${ver#*:}
+        floor=${ver%%.*}.$(cut -d. -f2 <<<"$ver" | tr -dc '0-9')
+        [[ $(vercmp "$floor" 6.9) -ge 0 ]] || floor=6.9
+        dep="$name>=$floor" ;;
+      glibc|gcc-libs)
+        ver=$(pacman -Q "$name" | cut -d' ' -f2); ver=${ver#*:}
+        ver=${ver%-*}; dep="$name>=${ver%%+*}" ;;
+    esac
+    pinned+=("$dep")
+  done
+  depends=("${pinned[@]}")
+
   install -Dm755 target/release/chord-mail "$pkgdir/usr/bin/chord-mail"
   install -Dm644 pkgbuild/chord-mail.desktop "$pkgdir/usr/share/applications/chord-mail.desktop"
   install -Dm644 pkgbuild/chord-mail.svg "$pkgdir/usr/share/icons/hicolor/scalable/apps/chord-mail.svg"
