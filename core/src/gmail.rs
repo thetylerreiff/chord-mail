@@ -158,6 +158,14 @@ pub enum ApiError {
     /// Gmail rejected the request itself (bad label, bad id). Retrying the
     /// same request will never work.
     Rejected(String),
+    /// Any other error status. Typed so the action queue can tell Gmail
+    /// turning a request down from throttling or a server failure.
+    Status {
+        status: u16,
+        /// A 403 that is really Gmail asking us to slow down.
+        rate_limited: bool,
+        message: String,
+    },
 }
 
 impl std::fmt::Display for ApiError {
@@ -166,6 +174,7 @@ impl std::fmt::Display for ApiError {
             ApiError::NotFound => write!(f, "not found"),
             ApiError::HistoryExpired => write!(f, "history is too old to replay"),
             ApiError::Rejected(m) => write!(f, "Gmail rejected the request: {m}"),
+            ApiError::Status { message, .. } => write!(f, "{message}"),
         }
     }
 }
@@ -304,6 +313,7 @@ impl Gmail {
             struct Detail {
                 message: String,
             }
+            let rate_limited = is_rate_limited(status, &text);
             let detail = serde_json::from_str::<Envelope>(&text)
                 .map(|e| e.error.message)
                 .unwrap_or(text);
@@ -312,7 +322,12 @@ impl Gmail {
             if status == reqwest::StatusCode::BAD_REQUEST {
                 return Err(ApiError::Rejected(detail).into());
             }
-            return Err(anyhow!("Gmail returned {status} for {path}: {detail}"));
+            return Err(ApiError::Status {
+                status: status.as_u16(),
+                rate_limited,
+                message: format!("Gmail returned {status} for {path}: {detail}"),
+            }
+            .into());
         }
         if text.trim().is_empty() {
             return Ok(serde_json::from_str("null")?);

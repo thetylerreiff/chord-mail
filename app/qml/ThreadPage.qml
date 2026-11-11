@@ -132,6 +132,7 @@ FocusScope {
 
                 Text {
                     Layout.fillWidth: true
+                    textFormat: Text.PlainText
                     text: page.subject !== "" ? page.subject : qsTr("(no subject)")
                     color: theme.bright
                     font.family: theme.font
@@ -141,6 +142,7 @@ FocusScope {
                 }
                 Text {
                     visible: page.labelNames !== ""
+                    textFormat: Text.PlainText
                     text: page.labelNames
                     color: theme.accent
                     font.family: theme.font
@@ -194,6 +196,7 @@ FocusScope {
                     spacing: 12
                     Text {
                         Layout.preferredWidth: 180
+                        textFormat: Text.PlainText
                         text: modelData.draft ? qsTr("Draft") : modelData.me ? qsTr("me") : modelData.fromName
                         color: modelData.draft ? theme.red : modelData.unread ? theme.bright : theme.foreground
                         font.family: theme.font
@@ -203,6 +206,7 @@ FocusScope {
                     }
                     Text {
                         Layout.fillWidth: true
+                        textFormat: Text.PlainText
                         text: modelData.snippet
                         color: theme.muted
                         font.family: theme.font
@@ -250,6 +254,7 @@ FocusScope {
                     Layout.fillWidth: true
                     spacing: 10
                     Text {
+                        textFormat: Text.PlainText
                         text: page.message ? page.message.fromName : ""
                         color: theme.bright
                         font.family: theme.font
@@ -258,6 +263,7 @@ FocusScope {
                     }
                     Text {
                         Layout.fillWidth: true
+                        textFormat: Text.PlainText
                         text: page.message ? page.message.address : ""
                         color: theme.muted
                         font.family: theme.font
@@ -273,6 +279,7 @@ FocusScope {
                 }
                 Text {
                     Layout.fillWidth: true
+                    textFormat: Text.PlainText
                     text: page.message ? qsTr("to %1").arg(page.message.to + (page.message.cc ? ", " + page.message.cc : "")) : ""
                     color: theme.muted
                     font.family: theme.font
@@ -330,28 +337,32 @@ FocusScope {
                 }
 
                 // Mail never navigates inside Chord: links go to the browser.
+                function openable(url) {
+                    return /^(https?|mailto):/i.test(url)
+                }
                 onNavigationRequested: function(request) {
                     const url = String(request.url)
                     if (request.navigationType === WebEngineNavigationRequest.LinkClickedNavigation) {
                         request.reject()
-                        if (url.indexOf("http") === 0 || url.indexOf("mailto:") === 0)
-                            Qt.openUrlExternally(request.url)
+                        if (openable(url)) Qt.openUrlExternally(request.url)
                         return
                     }
+                    // A large message loads from the one file the bridge wrote for it.
                     if (url.indexOf("https://chord.invalid/") === 0 || url.indexOf("data:") === 0
-                        || url.indexOf("file://") === 0 && url.indexOf("/chord-mail/") > 0)
+                        || page.rendered.url && url === page.rendered.url)
                         request.accept()
                     else
                         request.reject()
                 }
                 onNewWindowRequested: function(request) {
-                    Qt.openUrlExternally(request.requestedUrl)
+                    if (openable(String(request.requestedUrl))) Qt.openUrlExternally(request.requestedUrl)
                 }
             }
 
             Text {
                 anchors.centerIn: parent
                 visible: !page.rendered.ready && page.message !== null
+                textFormat: Text.PlainText
                 text: backend.setup === "ready" ? qsTr("Downloading…") : page.message ? page.message.snippet : ""
                 color: theme.muted
                 font.family: theme.font
@@ -387,6 +398,7 @@ FocusScope {
                     Text {
                         id: chip
                         anchors.centerIn: parent
+                        textFormat: Text.PlainText
                         text: modelData.name + "  " + (modelData.size > 1048576 ? (modelData.size / 1048576).toLocaleString(Qt.locale(), 'f', 1) + " MB"
                                                                                  : Math.max(1, Math.round(modelData.size / 1024)) + " KB")
                         color: theme.foreground

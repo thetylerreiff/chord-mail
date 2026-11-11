@@ -98,6 +98,10 @@ pub struct TickReport {
     pub woke: usize,
     pub sent: usize,
     pub notices: Vec<Notice>,
+    /// Why the queued actions couldn't all be pushed, when they couldn't.
+    /// The rest of the tick still runs: one stuck action mustn't stop sync,
+    /// snoozes, or scheduled mail.
+    pub queue_error: Option<String>,
 }
 
 /// Rows for the inbox, each with the index of its split.
@@ -120,10 +124,13 @@ const ACCOUNT_REFRESH_MS: i64 = 6 * 60 * 60 * 1000;
 
 /// One round of background work. The caller holds the lock.
 pub async fn tick(api: &impl MailApi, store: &mut Store, config: &Config) -> Result<TickReport> {
-    let mut report = TickReport {
-        flushed: ops::flush(api, store).await?,
-        ..Default::default()
-    };
+    let mut report = TickReport::default();
+    // Sync replays still-queued actions over what it fetches, so it's safe
+    // to sync with some left over.
+    match ops::flush(api, store).await {
+        Ok(n) => report.flushed = n,
+        Err(e) => report.queue_error = Some(format!("{e:#}")),
+    }
 
     let refreshed: i64 = store
         .meta("account_refreshed")?
@@ -154,7 +161,15 @@ pub async fn tick(api: &impl MailApi, store: &mut Store, config: &Config) -> Res
     let (woke, wake_notices) = wake_due(store)?;
     report.woke = woke;
     report.notices.extend(wake_notices);
-    report.flushed += ops::flush(api, store).await?;
+    // This flush is the newer word on the queue, so its outcome replaces
+    // the first one's.
+    match ops::flush(api, store).await {
+        Ok(n) => {
+            report.flushed += n;
+            report.queue_error = None;
+        }
+        Err(e) => report.queue_error = Some(format!("{e:#}")),
+    }
 
     report.sent = send_due(api, store).await?;
 
@@ -287,6 +302,44 @@ mod tests {
     use super::*;
     use crate::ops::apply;
     use crate::store::tests::row;
+
+    #[test]
+    fn a_stuck_action_doesnt_stop_the_rest_of_the_tick() {
+        use crate::ops::tests::{QueueFake, forbidden};
+        use crate::store::Op;
+        let mut store = Store::in_memory().unwrap();
+        let api = QueueFake::default();
+        api.failing.borrow_mut().push(("bad".into(), forbidden));
+        store
+            .enqueue(&Op::Trash {
+                thread: "bad".into(),
+            })
+            .unwrap();
+        store
+            .apply(false, &[row("a", "t", 1, &["INBOX"])], &[], None)
+            .unwrap();
+        apply(&mut store, &["t".into()], &Action::Snooze { until: 1 }).unwrap();
+
+        let report = tokio::runtime::Builder::new_current_thread()
+            .build()
+            .unwrap()
+            .block_on(tick(&api, &mut store, &Config::default()))
+            .unwrap();
+        assert!(report.sync.is_some(), "synced despite the queue");
+        assert_eq!(report.woke, 1, "snoozes still wake");
+        assert!(
+            report.queue_error.as_deref().unwrap_or("").contains("403"),
+            "{:?}",
+            report.queue_error
+        );
+        // Still queued, and still first.
+        assert_eq!(
+            store.pending_ops().unwrap()[0].1,
+            Op::Trash {
+                thread: "bad".into()
+            }
+        );
+    }
 
     #[test]
     fn due_snooze_wakes_with_a_notice() {

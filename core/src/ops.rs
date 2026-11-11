@@ -4,7 +4,7 @@
 use anyhow::Result;
 use serde::Serialize;
 
-use crate::gmail::{MailApi, is_permanent};
+use crate::gmail::{ApiError, MailApi, is_permanent};
 use crate::store::{Op, Snooze, SnoozeKind, Store};
 use crate::sync::now_ms;
 
@@ -265,9 +265,27 @@ pub fn undo(store: &mut Store, undo: &Undo) -> Result<()> {
     Ok(())
 }
 
+/// How many times Gmail may turn a queued action down (a 403 for missing
+/// permission, say) before it's dropped so the actions behind it can go.
+const MAX_REJECTIONS: i64 = 5;
+
+/// Whether Gmail itself answered and turned the request down: a 4xx status.
+/// Not 429 or a rate-limit 403 (slow down, not no), 408 (a timeout), or 401
+/// (the sign-in, not the action); and never a network error or a 5xx.
+fn is_rejection(e: &anyhow::Error) -> bool {
+    match e.downcast_ref() {
+        Some(ApiError::Status {
+            status,
+            rate_limited,
+            ..
+        }) => (400..500).contains(status) && !rate_limited && !matches!(status, 401 | 408 | 429),
+        _ => false,
+    }
+}
+
 /// Pushes queued actions to Gmail in order. Stops at the first one that
 /// fails for a reason a retry might fix, so later actions can't overtake it;
-/// drops ones Gmail will never accept.
+/// drops ones Gmail will never accept, or has rejected too often.
 pub async fn flush(api: &impl MailApi, store: &mut Store) -> Result<usize> {
     let mut done = 0;
     for (id, op) in store.pending_ops()? {
@@ -286,7 +304,13 @@ pub async fn flush(api: &impl MailApi, store: &mut Store) -> Result<usize> {
                 store.op_done(id)?;
             }
             Err(e) => {
-                store.op_failed(id, &format!("{e:#}"))?;
+                let rejected = is_rejection(&e);
+                let rejections = store.op_failed(id, &format!("{e:#}"), rejected)?;
+                if rejected && rejections >= MAX_REJECTIONS {
+                    eprintln!("chord: dropping an action Gmail rejected {rejections} times: {e:#}");
+                    store.op_done(id)?;
+                    continue;
+                }
                 return Err(e);
             }
         }
@@ -295,9 +319,141 @@ pub async fn flush(api: &impl MailApi, store: &mut Store) -> Result<usize> {
 }
 
 #[cfg(test)]
-mod tests {
+pub(crate) mod tests {
     use super::*;
+    use crate::gmail::{MessagePage, Profile};
     use crate::store::tests::row;
+    use std::cell::RefCell;
+
+    pub(crate) type MakeError = fn() -> anyhow::Error;
+
+    /// An empty mailbox whose `trash_thread` fails for chosen threads, and
+    /// that records the threads it trashed.
+    #[derive(Default)]
+    pub(crate) struct QueueFake {
+        pub failing: RefCell<Vec<(String, MakeError)>>,
+        pub trashed: RefCell<Vec<String>>,
+    }
+
+    impl MailApi for QueueFake {
+        async fn profile(&self) -> Result<Profile> {
+            Ok(Profile {
+                email_address: "me@example.com".into(),
+                history_id: "1".into(),
+            })
+        }
+        async fn list_messages(&self, _label: &str, _page: Option<&str>) -> Result<MessagePage> {
+            Ok(MessagePage::default())
+        }
+        async fn message_metadata(&self, _id: &str) -> Result<crate::gmail::Message> {
+            Err(ApiError::NotFound.into())
+        }
+        async fn history(
+            &self,
+            _start: &str,
+            _page: Option<&str>,
+        ) -> Result<crate::gmail::HistoryPage> {
+            Err(ApiError::HistoryExpired.into())
+        }
+        async fn trash_thread(&self, id: &str) -> Result<()> {
+            if let Some((_, error)) = self.failing.borrow().iter().find(|(t, _)| t == id) {
+                return Err(error());
+            }
+            self.trashed.borrow_mut().push(id.into());
+            Ok(())
+        }
+    }
+
+    pub(crate) fn status(status: u16, rate_limited: bool) -> anyhow::Error {
+        ApiError::Status {
+            status,
+            rate_limited,
+            message: format!("Gmail returned {status} for /threads/bad/trash: no"),
+        }
+        .into()
+    }
+
+    pub(crate) fn forbidden() -> anyhow::Error {
+        status(403, false)
+    }
+
+    fn queue_bad_then_good(store: &mut Store, api: &QueueFake, error: MakeError) {
+        api.failing.borrow_mut().push(("bad".into(), error));
+        for thread in ["bad", "good"] {
+            store
+                .enqueue(&Op::Trash {
+                    thread: thread.into(),
+                })
+                .unwrap();
+        }
+    }
+
+    fn block_on<F: std::future::Future>(f: F) -> F::Output {
+        tokio::runtime::Builder::new_current_thread()
+            .build()
+            .unwrap()
+            .block_on(f)
+    }
+
+    #[test]
+    fn an_action_gmail_keeps_rejecting_is_dropped_after_the_cap() {
+        let mut store = Store::in_memory().unwrap();
+        let api = QueueFake::default();
+        queue_bad_then_good(&mut store, &api, forbidden);
+        for _ in 1..MAX_REJECTIONS {
+            assert!(block_on(flush(&api, &mut store)).is_err());
+            assert_eq!(
+                store.pending_ops().unwrap().len(),
+                2,
+                "nothing overtakes it"
+            );
+            assert!(api.trashed.borrow().is_empty());
+        }
+        assert_eq!(block_on(flush(&api, &mut store)).unwrap(), 1);
+        assert!(store.pending_ops().unwrap().is_empty());
+        assert_eq!(*api.trashed.borrow(), ["good"]);
+    }
+
+    #[test]
+    fn network_server_and_throttling_errors_never_drop_an_action() {
+        let transient: [MakeError; 6] = [
+            || anyhow::anyhow!("error sending request: connection refused"),
+            || status(503, false),
+            || status(500, false),
+            || status(429, false),
+            || status(403, true),
+            || status(408, false),
+        ];
+        for error in transient {
+            let mut store = Store::in_memory().unwrap();
+            let api = QueueFake::default();
+            queue_bad_then_good(&mut store, &api, error);
+            for _ in 0..(MAX_REJECTIONS * 10) {
+                assert!(block_on(flush(&api, &mut store)).is_err());
+            }
+            assert_eq!(store.pending_ops().unwrap().len(), 2, "{}", error());
+            assert!(api.trashed.borrow().is_empty());
+        }
+    }
+
+    #[test]
+    fn only_gmail_turning_the_action_down_counts_as_a_rejection() {
+        assert!(is_rejection(&status(403, false)));
+        assert!(is_rejection(&status(409, false)));
+        for e in [
+            status(401, false),
+            status(403, true),
+            status(408, false),
+            status(429, false),
+            status(500, false),
+            status(503, false),
+            anyhow::anyhow!("timed out"),
+            // Already dropped at once as permanent.
+            ApiError::NotFound.into(),
+        ] {
+            assert!(!is_rejection(&e), "{e}");
+        }
+    }
 
     fn store_with_thread() -> Store {
         let mut store = Store::in_memory().unwrap();

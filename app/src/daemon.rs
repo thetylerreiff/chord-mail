@@ -79,12 +79,41 @@ pub fn notify(n: Notice) {
         if let Ok(out) = output
             && String::from_utf8_lossy(&out.stdout).trim() == "open"
         {
-            let exe = std::env::current_exe().unwrap_or_else(|_| "chord-mail".into());
-            let _ = std::process::Command::new(exe)
-                .args(["open", "--thread", &n.thread_id])
-                .spawn();
+            open_window(&n.thread_id);
         }
     });
+}
+
+/// Opens the window on a conversation. A child of the service would live in
+/// its cgroup and die whenever the service restarts (every update does), so
+/// it gets a scope of its own when systemd-run is there.
+fn open_window(thread_id: &str) {
+    let exe = own_exe();
+    let args = ["open", "--thread", thread_id];
+    let scoped = std::process::Command::new("systemd-run")
+        .args(["--user", "--scope", "--collect", "--quiet", "--"])
+        .arg(&exe)
+        .args(args)
+        .spawn();
+    if scoped.is_err() {
+        let _ = std::process::Command::new(&exe).args(args).spawn();
+    }
+}
+
+/// This binary's path. After an upgrade replaces it under the running
+/// service, Linux reports it as "/usr/bin/chord-mail (deleted)"; the new one
+/// is at the same path without the suffix.
+fn own_exe() -> std::path::PathBuf {
+    use std::os::unix::ffi::OsStrExt;
+    std::env::current_exe()
+        .ok()
+        .map(|p| {
+            let bytes = p.as_os_str().as_bytes();
+            let live = bytes.strip_suffix(b" (deleted)").unwrap_or(bytes);
+            std::path::PathBuf::from(std::ffi::OsStr::from_bytes(live))
+        })
+        .filter(|p| p.exists())
+        .unwrap_or_else(|| "chord-mail".into())
 }
 
 /// The text of a caught panic, for reporting it.

@@ -71,11 +71,9 @@ aarch64.
 curl -fsSL https://chord.thetylerreiff.co/install | bash
 ```
 
-The [script](site/public/install.sh) downloads the latest release package,
-checks it against its checksum, installs it, and enables the background
-service. Run it again to update. On aarch64 it builds the package from source
-instead, and a source build signs in with
-[your own Google client](#use-your-own-google-client).
+The [script](site/public/install.sh) installs the build tools, builds the Arch
+package from source, and enables the background service. Run it again to
+update.
 
 <details>
 <summary><b>Or build it by hand</b></summary>
@@ -93,9 +91,7 @@ systemctl --user enable --now chord-mail   # background sync, snoozes, and notif
 ```
 
 `bin/install` uses `makepkg`, which installs Chord's dependencies (Qt 6,
-Neovim, `lld`) with pacman. Chord then appears in the app launcher. A build
-from source has no built-in Google sign-in, so connect it with
-[your own Google client](#use-your-own-google-client).
+Neovim, `lld`) with pacman. Chord then appears in the app launcher.
 
 </details>
 
@@ -103,21 +99,9 @@ To have `mailto:` links open in Chord, run `chord-mail default`.
 
 ## Connect Gmail
 
-Open Chord (`Super+Space`, "Chord") and press `Enter`. Google's sign-in opens
-in your browser; approve access, and Chord starts syncing. Your mail goes
-straight from Google to your machine. Chord has no servers, so no one else
-ever sees it.
-
-> [!NOTE]
-> Until Google finishes verifying Chord, sign-in warns that Google hasn't
-> verified the app. **Advanced → Go to Chord** continues past it.
-
-### Use your own Google client
-
-A build from source has no built-in sign-in, and anyone can use their own
-Google Cloud OAuth client instead of Chord's. When
-`~/.config/chord-mail/client_secret.json` exists, Chord signs in with it.
-Setup takes about five minutes, and you only do it once.
+Chord talks to Gmail through **your own** Google Cloud OAuth client, so your
+mail goes straight from Google to your machine and no third party ever sees
+it. Setup takes about five minutes, and you only do it once.
 
 1. Open [Google Cloud Console](https://console.cloud.google.com/) and create a
    project named `Chord`.
@@ -135,9 +119,7 @@ Setup takes about five minutes, and you only do it once.
 > Google just shows a warning during sign-in, and **Advanced → Go to Chord**
 > continues past it.
 
-Then open Chord and press `Enter` to sign in. If you add or remove the file
-after signing in, Chord asks you to sign in again, since a Google sign-in
-belongs to the client that made it.
+Then open Chord (`Super+Space`, "Chord") and press `Enter` to sign in.
 
 ## Keys
 
@@ -281,11 +263,11 @@ undo_seconds = 10
 
 Chord asks for the `gmail.modify` scope, which lets it read, label, archive,
 trash, and send. It can't permanently delete mail. Everything it stores stays
-on your machine, in folders only your user account can open:
+on your machine:
 
 | Path | Contents |
 |---|---|
-| `~/.config/chord-mail/client_secret.json` | Your own OAuth client, if you use one |
+| `~/.config/chord-mail/client_secret.json` | Your OAuth client |
 | `~/.config/chord-mail/config.toml` | Settings |
 | `~/.local/share/chord-mail/token.json` | Your sign-in (mode 0600) |
 | `~/.local/share/chord-mail/mail.db` | The cache, action queue, snoozes, and schedule |
@@ -339,14 +321,6 @@ dev/tour     # screenshots of every screen from a made-up mailbox, offscreen
 dev/cards       # redraws the banner above and the site's link preview (needs chromium)
 cd site && bun run dev          # the website, at http://localhost:4173
 ```
-
-Tagging a version (`git tag v0.1.0 && git push --tags`) runs the
-[release workflow](.github/workflows/release.yml). It builds and tests the
-x86_64 package with Chord's Google client compiled in from the repository
-secrets `CHORD_GOOGLE_CLIENT_ID` and `CHORD_GOOGLE_CLIENT_SECRET`, then
-publishes it as a GitHub Release for the installer. The client never appears
-in the source, since Google's API terms keep developer credentials out of
-open-source code. Every other build has no built-in client.
 
 The website lives in `site/` and deploys to
 [chord.thetylerreiff.co](https://chord.thetylerreiff.co) on Vercel from

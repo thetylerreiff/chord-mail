@@ -86,7 +86,8 @@ ApplicationWindow {
         case "draft-saved": return qsTr("Saved to Drafts")
         case "kept-local": return qsTr("Draft kept at %1").arg(detail)
         case "discarded": return qsTr("Draft discarded")
-        case "already-composing": return qsTr("Finish the draft that's open in Neovim first")
+        case "already-composing": return qsTr("Finish the draft that's open in Neovim first (Shift+Esc stops waiting)")
+        case "signed-out": return qsTr("Your Google sign-in expired; sign in again to keep syncing")
         case "saved": return qsTr("Saved %1 to Downloads").arg(detail)
         case "images-allowed": return qsTr("Images from %1 will always load").arg(detail)
         case "error": return detail
@@ -172,7 +173,7 @@ ApplicationWindow {
 
     function quit() {
         if (backend.composing) {
-            toast.show(qsTr("Finish the draft that's open in Neovim first"), false, false)
+            toast.show(qsTr("Finish the draft that's open in Neovim first (Shift+Esc stops waiting)"), false, false)
             return
         }
         if (reviewing) backend.saveDraft()
@@ -389,6 +390,8 @@ ApplicationWindow {
     Key { sequences: ["/"]; enabled: root.onMail; onActivated: searchBar.open() }
     Key { sequences: ["C"]; enabled: root.onMail; onActivated: root.compose("new") }
     Key { sequences: ["Z", StandardKey.Undo]; enabled: root.keysOn; onActivated: backend.undo() }
+    // For when Neovim's exit never comes back: stop waiting, keep the file.
+    Key { sequences: ["Shift+Esc"]; enabled: root.keysOn && backend.composing; onActivated: backend.stopComposing() }
     Key { sequences: ["Q"]; enabled: root.onMail; onActivated: root.quit() }
 
     Key { sequences: ["G,I"]; enabled: root.onMail; onActivated: root.goTo("inbox") }

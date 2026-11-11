@@ -129,22 +129,33 @@ impl Token {
 
     /// Writes beside the target and renames, so a crash never leaves a
     /// half-written token, and creates the file 0600 so it is never readable
-    /// by other users, even for an instant.
+    /// by other users, even for an instant. The window and the service can
+    /// refresh at the same moment, so each writer gets its own temp file
+    /// rather than truncating the other's mid-write.
     pub fn save(&self, path: &Path) -> Result<()> {
         if let Some(dir) = path.parent() {
             crate::paths::private_dir(dir)?;
         }
-        let tmp = path.with_extension("json.tmp");
-        let mut file = std::fs::OpenOptions::new()
-            .write(true)
-            .create(true)
-            .truncate(true)
-            .mode(0o600)
-            .open(&tmp)?;
-        file.write_all(serde_json::to_string_pretty(self)?.as_bytes())?;
-        file.sync_all()?;
-        std::fs::rename(&tmp, path)?;
-        Ok(())
+        let name = path.file_name().and_then(|n| n.to_str()).unwrap_or("token");
+        let tmp = path.with_file_name(format!(
+            ".{name}.{}.{:016x}.tmp",
+            std::process::id(),
+            rand::random::<u64>()
+        ));
+        let write = || -> Result<()> {
+            let mut file = std::fs::OpenOptions::new()
+                .write(true)
+                .create_new(true)
+                .mode(0o600)
+                .open(&tmp)?;
+            file.write_all(serde_json::to_string_pretty(self)?.as_bytes())?;
+            file.sync_all()?;
+            std::fs::rename(&tmp, path)?;
+            Ok(())
+        };
+        write().inspect_err(|_| {
+            let _ = std::fs::remove_file(&tmp);
+        })
     }
 
     /// Whether this sign-in can be refreshed with `client`.
@@ -187,18 +198,71 @@ struct TokenError {
     error_description: Option<String>,
 }
 
+/// Google's token endpoint turned a request down with an OAuth error code,
+/// kept typed so a dead sign-in can be told apart from a passing failure.
+#[derive(Debug)]
+struct OAuthError {
+    status: reqwest::StatusCode,
+    code: String,
+    description: Option<String>,
+}
+
+impl std::fmt::Display for OAuthError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "Google refused the token request ({}): {}",
+            self.status, self.code
+        )?;
+        if let Some(d) = &self.description {
+            write!(f, ": {d}")?;
+        }
+        Ok(())
+    }
+}
+
+impl std::error::Error for OAuthError {}
+
+/// The error for a failed token response. Built from Google's reply only,
+/// never from the form, so no token or client secret ends up in it.
+fn token_error(status: reqwest::StatusCode, body: &str) -> anyhow::Error {
+    match serde_json::from_str::<TokenError>(body) {
+        Ok(e) => OAuthError {
+            status,
+            code: e.error,
+            description: e.error_description,
+        }
+        .into(),
+        Err(_) => anyhow!("Google refused the token request ({status}): {body}"),
+    }
+}
+
+/// Whether Google said the refresh token itself is no good: the user revoked
+/// Chord's access, changed their password, or the sign-in expired. Retrying
+/// will never work; only signing in again will.
+fn sign_in_is_dead(e: &anyhow::Error) -> bool {
+    matches!(e.downcast_ref::<OAuthError>(), Some(o) if o.code == "invalid_grant")
+}
+
+/// Deletes the saved token after Google rejected `rejected_refresh`, which
+/// is what makes the app show the sign-in page again. A token with another
+/// refresh token is a newer sign-in that landed meanwhile, so it stays.
+fn forget_dead_sign_in(path: &Path, rejected_refresh: &str) -> Result<()> {
+    match Token::load(path) {
+        Ok(t) if t.refresh_token == rejected_refresh => match std::fs::remove_file(path) {
+            Err(e) if e.kind() != std::io::ErrorKind::NotFound => Err(e.into()),
+            _ => Ok(()),
+        },
+        _ => Ok(()),
+    }
+}
+
 async fn post_token(http: &reqwest::Client, form: &[(&str, &str)]) -> Result<TokenResponse> {
     let resp = http.post(TOKEN_URL).form(form).send().await?;
     let status = resp.status();
     let body = resp.text().await?;
     if !status.is_success() {
-        let detail = serde_json::from_str::<TokenError>(&body)
-            .map(|e| match e.error_description {
-                Some(d) => format!("{}: {d}", e.error),
-                None => e.error,
-            })
-            .unwrap_or(body);
-        bail!("Google refused the token request ({status}): {detail}");
+        return Err(token_error(status, &body));
     }
     Ok(serde_json::from_str(&body)?)
 }
@@ -321,7 +385,7 @@ pub async fn access_token(http: &reqwest::Client, client: &Client, path: &Path) 
         );
     }
     if !token.is_fresh() {
-        let resp = post_token(
+        let resp = match post_token(
             http,
             &[
                 ("client_id", &client.id),
@@ -331,7 +395,23 @@ pub async fn access_token(http: &reqwest::Client, client: &Client, path: &Path) 
             ],
         )
         .await
-        .context("couldn't refresh the session; run `chord-mail login` again")?;
+        {
+            Ok(resp) => resp,
+            Err(e) if sign_in_is_dead(&e) => {
+                // Keeping the file would leave Chord "signed in" but offline
+                // for good, re-sending the dead token every few minutes.
+                forget_dead_sign_in(path, &token.refresh_token)?;
+                return Err(e.context(
+                    "the Google sign-in expired or was revoked; sign in again \
+                     (`chord-mail login`)",
+                ));
+            }
+            // Network trouble, a server error, or anything else: the sign-in
+            // may well still be good, so keep it.
+            Err(e) => {
+                return Err(e.context("couldn't refresh the session; run `chord-mail login` again"));
+            }
+        };
         token.access_token = resp.access_token;
         token.expires_at = now() + resp.expires_in;
         if let Some(refresh) = resp.refresh_token {
@@ -377,6 +457,84 @@ mod tests {
         let mode = std::fs::metadata(&path).unwrap().permissions().mode() & 0o777;
         assert_eq!(mode, 0o600);
         assert_eq!(Token::load(&path).unwrap().refresh_token, "r");
+        std::fs::remove_dir_all(dir).unwrap();
+    }
+
+    #[test]
+    fn saves_leave_no_temp_files_even_when_racing() {
+        let dir = std::env::temp_dir().join(format!("chord-save-{}", random_urlsafe(6)));
+        let path = dir.join("token.json");
+        let token = |n: i64| Token {
+            access_token: "a".into(),
+            refresh_token: "r".into(),
+            expires_at: n,
+            client_id: "c".into(),
+        };
+        std::thread::scope(|s| {
+            for n in 0..8 {
+                let path = &path;
+                s.spawn(move || {
+                    for _ in 0..10 {
+                        token(n).save(path).unwrap();
+                    }
+                });
+            }
+        });
+        assert!((0..8).contains(&Token::load(&path).unwrap().expires_at));
+        let names: Vec<_> = std::fs::read_dir(&dir)
+            .unwrap()
+            .map(|e| e.unwrap().file_name())
+            .collect();
+        assert_eq!(names, ["token.json"]);
+        std::fs::remove_dir_all(dir).unwrap();
+    }
+
+    #[test]
+    fn only_invalid_grant_means_the_sign_in_is_dead() {
+        let bad = reqwest::StatusCode::BAD_REQUEST;
+        let dead = token_error(
+            bad,
+            r#"{"error":"invalid_grant","error_description":"Token has been expired or revoked."}"#,
+        );
+        assert!(sign_in_is_dead(&dead));
+        assert!(dead.to_string().contains("invalid_grant"), "{dead}");
+        // Still recognised once the caller adds context.
+        assert!(sign_in_is_dead(&dead.context("refreshing")));
+
+        for alive in [
+            token_error(bad, r#"{"error":"invalid_client"}"#),
+            token_error(
+                bad,
+                r#"{"error":"invalid_request","error_description":"x"}"#,
+            ),
+            token_error(
+                reqwest::StatusCode::SERVICE_UNAVAILABLE,
+                "<html>try later</html>",
+            ),
+            token_error(reqwest::StatusCode::INTERNAL_SERVER_ERROR, ""),
+            anyhow!("error sending request: connection refused"),
+        ] {
+            assert!(!sign_in_is_dead(&alive), "{alive}");
+        }
+    }
+
+    #[test]
+    fn a_dead_sign_in_is_forgotten_but_a_newer_one_kept() {
+        let dir = std::env::temp_dir().join(format!("chord-dead-{}", random_urlsafe(6)));
+        let path = dir.join("token.json");
+        let token = |refresh: &str| Token {
+            access_token: "a".into(),
+            refresh_token: refresh.into(),
+            expires_at: 0,
+            client_id: "c".into(),
+        };
+        token("new").save(&path).unwrap();
+        forget_dead_sign_in(&path, "old").unwrap();
+        assert!(Token::load(&path).is_ok(), "a sign-in made meanwhile stays");
+        forget_dead_sign_in(&path, "new").unwrap();
+        assert!(!path.exists());
+        assert!(Token::load(&path).is_err(), "so the app is signed out");
+        forget_dead_sign_in(&path, "new").unwrap();
         std::fs::remove_dir_all(dir).unwrap();
     }
 

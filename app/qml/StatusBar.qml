@@ -13,7 +13,7 @@ Rectangle {
         : [["Enter", qsTr("open")], ["E", qsTr("done")], ["H", qsTr("snooze")], ["C", qsTr("compose")], ["/", qsTr("search")], ["Ctrl+K", qsTr("commands")], ["?", qsTr("keys")]]
 
     readonly property string status: {
-        if (backend.composing) return qsTr("Writing in Neovim…")
+        if (backend.composing) return qsTr("Writing in Neovim… · Shift+Esc stops waiting")
         if (backend.syncing) return qsTr("Syncing…")
         if (backend.loading) return qsTr("Loading…")
         const waiting = backend.pending > 0 ? qsTr("%n waiting to sync", "", backend.pending) : ""

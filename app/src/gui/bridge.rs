@@ -95,6 +95,9 @@ pub mod qobject {
         fn compose(self: Pin<&mut Backend>, kind: &QString, message_id: &QString, link: &QString);
         #[qinvokable]
         fn poll_compose(self: Pin<&mut Backend>);
+        /// Stops waiting for the editor, keeping the draft file.
+        #[qinvokable]
+        fn stop_composing(self: Pin<&mut Backend>);
         #[qinvokable]
         fn edit_draft(self: Pin<&mut Backend>);
         /// Sends the reviewed draft. `later` schedules it (ms, 0 for now);
@@ -406,8 +409,26 @@ impl qobject::Backend {
         self.notice(q(kind), count as i32, q(detail), undoable);
     }
 
-    fn fail(self: Pin<&mut Self>, e: anyhow::Error) {
+    fn fail(mut self: Pin<&mut Self>, e: anyhow::Error) {
+        // A failure that came from losing the sign-in says that instead.
+        if self.as_mut().signed_out() {
+            return;
+        }
         self.toast("error", 0, &format!("{e:#}"), false);
+    }
+
+    /// Google can revoke a sign-in (core then deletes the saved token), and
+    /// `chord-mail logout` deletes it from a terminal. Either way the window
+    /// would sit at "Offline" for good, so this takes it back to sign-in.
+    /// It only reads local files, so it's cheap to run after any failure.
+    fn signed_out(mut self: Pin<&mut Self>) -> bool {
+        if demo() || self.setup().to_string() != "ready" || service::signed_in() {
+            return false;
+        }
+        self.as_mut().set_sync_error(QString::default());
+        self.as_mut().check_setup();
+        self.toast("signed-out", 0, "", false);
+        true
     }
 
     fn check_setup(mut self: Pin<&mut Self>) {
@@ -471,6 +492,11 @@ impl qobject::Backend {
         if *self.syncing() || self.setup().to_string() != "ready" || demo() {
             return;
         }
+        // The timer brings us here every 30 seconds, which is how a
+        // `chord-mail logout` in a terminal reaches the open window.
+        if self.as_mut().signed_out() {
+            return;
+        }
         self.as_mut().set_syncing(true);
         let config = self.config.clone();
         self.spawn(async move {
@@ -495,7 +521,10 @@ impl qobject::Backend {
                             }
                         }
                     }
-                    Err(e) => b.as_mut().set_sync_error(q(&format!("{e:#}"))),
+                    Err(e) => {
+                        b.as_mut().set_sync_error(q(&format!("{e:#}")));
+                        b.as_mut().signed_out();
+                    }
                 }
                 b.as_mut().refresh();
                 b.as_mut().reload_thread();
@@ -518,6 +547,7 @@ impl qobject::Backend {
             Box::new(move |mut b: Pin<&mut qobject::Backend>| {
                 if let Err(e) = result {
                     b.as_mut().set_sync_error(q(&format!("{e:#}")));
+                    b.as_mut().signed_out();
                 }
                 b.as_mut().update_pending();
             }) as Apply
@@ -918,7 +948,6 @@ impl qobject::Backend {
         })();
         match result {
             Ok(path) => {
-                let _ = std::process::Command::new("xdg-open").arg(&path).spawn();
                 let name = path
                     .file_name()
                     .map(|n| n.to_string_lossy().into_owned())
@@ -1164,7 +1193,10 @@ impl qobject::Backend {
         };
         // Neovim runs in Omarchy's floating terminal; the exit code lands in
         // a file because terminal launchers return before the editor quits.
-        let script = "nvim \"+$2\" -c 'setlocal spell wrap linebreak textwidth=0' -c 'if getline(\".\") ==# \"\" | startinsert | else | startinsert! | endif' -- \"$1\"; echo $? > \"$3\"";
+        // It's written beside and renamed so a poll never reads it half
+        // written, and closing the terminal (HUP) still records an exit
+        // rather than leaving the window waiting for good.
+        let script = "x=\"$3\"; finish() { echo \"$1\" > \"$x.tmp\" && mv -f \"$x.tmp\" \"$x\"; }; trap 'finish 129; exit 129' HUP; trap 'finish 143; exit 143' TERM; nvim \"+$2\" -c 'setlocal spell wrap linebreak textwidth=0' -c 'if getline(\".\") ==# \"\" | startinsert | else | startinsert! | endif' -- \"$1\"; finish $?";
         // CHORD_COMPOSE_CMD stands in for the editor in the development tour:
         // a shell command run with the draft, start line, and exit file.
         let spawned = match std::env::var("CHORD_COMPOSE_CMD") {
@@ -1217,9 +1249,20 @@ impl qobject::Backend {
         let Ok(code) = std::fs::read_to_string(&exit) else {
             return;
         };
+        // Empty means the code isn't written yet (the development stand-in
+        // writes in place); look again on the next poll.
+        let Ok(code) = code.trim().parse::<i32>() else {
+            return;
+        };
         let _ = std::fs::remove_file(&exit);
+        // Killed by a signal, its terminal closed most likely: that's not
+        // `:cq`, so keep whatever was saved.
+        if code > 128 {
+            self.as_mut().keep_draft_file();
+            return;
+        }
         self.as_mut().set_composing(false);
-        if code.trim() != "0" {
+        if code != 0 {
             self.as_mut().discard_draft();
             return;
         }
@@ -1543,6 +1586,23 @@ impl qobject::Backend {
                 }
             }) as Apply
         });
+    }
+
+    /// Gives up on an editor whose exit never arrived. The draft file is
+    /// left where it is, since Neovim may still have it open.
+    fn stop_composing(self: Pin<&mut Self>) {
+        if *self.composing() {
+            self.keep_draft_file();
+        }
+    }
+
+    fn keep_draft_file(mut self: Pin<&mut Self>) {
+        let path = self.as_mut().rust_mut().compose.take().map(|c| c.path);
+        self.as_mut().set_review(QString::default());
+        self.as_mut().set_composing(false);
+        if let Some(path) = path {
+            self.toast("kept-local", 0, &path.display().to_string(), false);
+        }
     }
 
     fn discard_draft(mut self: Pin<&mut Self>) {

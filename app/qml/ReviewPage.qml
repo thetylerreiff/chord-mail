@@ -41,6 +41,7 @@ Item {
         }
         Text {
             Layout.fillWidth: true
+            textFormat: Text.PlainText
             text: parent.value
             color: parent.valueColor
             font.family: theme.font
@@ -99,6 +100,7 @@ Item {
                     Layout.topMargin: 6
                     Layout.fillWidth: true
                     wrapMode: Text.Wrap
+                    textFormat: Text.PlainText
                     text: modelData.suggestions.length > 0
                           ? qsTr("“%1” matches several people: %2. Press E and pick one.").arg(modelData.entry).arg(modelData.suggestions.join("; "))
                           : qsTr("“%1” isn't an email address. Press E to fix it.").arg(modelData.entry)
@@ -127,8 +129,12 @@ Item {
             settings.forceDarkMode: theme.dark
             settings.focusOnNavigationEnabled: false
             onNavigationRequested: function(request) {
-                if (request.navigationType === WebEngineNavigationRequest.LinkClickedNavigation) request.reject()
-                else request.accept()
+                // Only the load of the preview itself; nothing the mail asks for.
+                if (request.navigationType !== WebEngineNavigationRequest.LinkClickedNavigation
+                    && (String(request.url).indexOf("data:") === 0 || String(request.url) === "https://chord.invalid/"))
+                    request.accept()
+                else
+                    request.reject()
             }
         }
 

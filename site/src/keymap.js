@@ -85,6 +85,7 @@ function drawKeyboard(svg) {
   const width = 15 * U;
   const height = 5 * U;
   const BAND = 92; // room for two tiers of labels above and below
+  svg.setAttribute('viewBox', `-8 ${-BAND} ${width + 16} ${height + BAND * 2}`);
   const keys = {};
   const g = el('g', { class: 'board' });
   // The case: one hairline plate around the keys.
@@ -125,13 +126,6 @@ function drawKeyboard(svg) {
     notes.append(el('text', { x: x + 6, y: y1 + 4, class: id === 'e' ? 'hot' : '' }, text));
   }
   svg.append(g, notes, dots);
-  // The bands are only reserved while the labels show (the stylesheet hides them on narrow screens).
-  const fit = () => {
-    const band = getComputedStyle(notes).display === 'none' ? 8 : BAND;
-    svg.setAttribute('viewBox', `-8 ${-band} ${width + 16} ${height + band * 2}`);
-  };
-  fit();
-  addEventListener('resize', fit);
   return keys;
 }
 

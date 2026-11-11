@@ -195,15 +195,17 @@ pub(crate) fn parse_at(input: &str, now: NaiveDateTime) -> Option<NaiveDateTime>
     {
         let n: i64 = joined[..i].parse().ok()?;
         let unit = &joined[i..];
+        // This runs on every keystroke, so an absurd number like "100000000d"
+        // must come back as None rather than overflow chrono and panic.
         let delta = match unit {
-            "m" | "min" | "mins" | "minute" | "minutes" => Some(Duration::minutes(n)),
-            "h" | "hr" | "hrs" | "hour" | "hours" => Some(Duration::hours(n)),
-            "d" | "day" | "days" => Some(Duration::days(n)),
-            "w" | "wk" | "wks" | "week" | "weeks" => Some(Duration::weeks(n)),
+            "m" | "min" | "mins" | "minute" | "minutes" => Some(Duration::try_minutes(n)),
+            "h" | "hr" | "hrs" | "hour" | "hours" => Some(Duration::try_hours(n)),
+            "d" | "day" | "days" => Some(Duration::try_days(n)),
+            "w" | "wk" | "wks" | "week" | "weeks" => Some(Duration::try_weeks(n)),
             _ => None,
         };
         if let Some(d) = delta {
-            return Some(now + d);
+            return now.checked_add_signed(d?);
         }
     }
 
@@ -283,6 +285,24 @@ mod tests {
         assert_eq!(at("30 min"), "Wed Nov 4 11:00");
         assert_eq!(at("3d"), "Sat Nov 7 10:30");
         assert_eq!(at("1 week"), "Wed Nov 11 10:30");
+    }
+
+    #[test]
+    fn absurd_relative_times_are_rejected_not_panics() {
+        for input in [
+            "100000000d",
+            "9223372036854775807m",
+            "9223372036854775807h",
+            "9223372036854775807d",
+            "9223372036854775807w",
+            "999999999999m",
+            "999999999999h",
+            "99999999w",
+        ] {
+            assert_eq!(at(input), "", "{input}");
+        }
+        // Too many digits for an i64 at all.
+        assert_eq!(at("99999999999999999999d"), "");
     }
 
     #[test]

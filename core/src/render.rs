@@ -122,21 +122,9 @@ pub fn render(raw: &[u8], opts: &Options) -> Rendered {
     let html = html_part(&msg);
     let mut used_cids = Vec::new();
     let (page, plain, has_remote, has_quotes) = match html {
-        Some(mut html) => {
-            for p in &parts {
-                let Some(cid) = p.content_id() else { continue };
-                let cid = cid.trim_matches(|c| c == '<' || c == '>');
-                let needle = format!("cid:{cid}");
-                if html.contains(&needle) {
-                    let uri = format!(
-                        "data:{};base64,{}",
-                        mime_of(p),
-                        STANDARD.encode(p.decoded())
-                    );
-                    html = html.replace(&needle, &uri);
-                    used_cids.push(p.id());
-                }
-            }
+        Some(html) => {
+            let html = strip_nav_tags(&html);
+            let html = inline_cids(&html, &parts, MAX_INLINED_BYTES, &mut used_cids);
             let lower = html.to_lowercase();
             let has_remote = references_remote(&lower);
             let has_quotes = QUOTE_MARKERS.iter().any(|m| lower.contains(m));
@@ -174,6 +162,214 @@ pub fn render(raw: &[u8], opts: &Options) -> Rendered {
         has_quotes,
         attachments,
     }
+}
+
+/// Most bytes of data: URIs inlined into one page. Every `cid:` reference
+/// gets its own copy of the image, so one message that names a large image
+/// thousands of times would otherwise grow to gigabytes and take the window
+/// down each time it is opened. Real mail stays far below this.
+const MAX_INLINED_BYTES: usize = 32 << 20;
+
+/// Replaces `cid:` references with data: URIs of the parts they name,
+/// spending at most `budget` bytes of URI. References past the budget are
+/// left as they are; the page's policy blocks them, so they just don't show.
+/// Parts inlined at least once are added to `used`.
+fn inline_cids(
+    html: &str,
+    parts: &[MessagePart<'_>],
+    mut budget: usize,
+    used: &mut Vec<u32>,
+) -> String {
+    let mut html = html.to_string();
+    for p in parts {
+        let Some(cid) = p.content_id() else { continue };
+        let cid = cid.trim_matches(|c| c == '<' || c == '>');
+        let needle = format!("cid:{cid}");
+        if !html.contains(&needle) {
+            continue;
+        }
+        let uri = format!(
+            "data:{};base64,{}",
+            mime_of(p),
+            STANDARD.encode(p.decoded())
+        );
+        let mut out = String::with_capacity(html.len());
+        let mut last = 0;
+        let mut inlined = false;
+        for (i, _) in html.match_indices(&needle) {
+            if uri.len() > budget {
+                break;
+            }
+            budget -= uri.len();
+            out.push_str(&html[last..i]);
+            out.push_str(&uri);
+            last = i + needle.len();
+            inlined = true;
+        }
+        out.push_str(&html[last..]);
+        html = out;
+        if inlined {
+            used.push(p.id());
+        }
+    }
+    html
+}
+
+/// Removes `<meta>`, `<link>` and `<base>` elements from received HTML. A
+/// meta refresh would navigate the view (or a reply's quoted original) to a
+/// remote page, and link and base fetch or redirect remote URLs.
+///
+/// The scan follows how a browser splits markup into tags, so that a quoted
+/// attribute value, a comment or a `<style>` block can't hide a tag from it
+/// that the browser would still see. Offsets come from the original string
+/// and only ASCII bytes are matched, so slicing never lands mid-character.
+fn strip_nav_tags(html: &str) -> String {
+    let b = html.as_bytes();
+    let mut out = String::with_capacity(html.len());
+    let mut i = 0;
+    while let Some(off) = html[i..].find('<') {
+        let lt = i + off;
+        out.push_str(&html[i..lt]);
+        let rest = &b[lt + 1..];
+        let (end, name) = if rest.starts_with(b"!--") {
+            (comment_end(b, lt + 4), None)
+        } else if rest.first().is_some_and(u8::is_ascii_alphabetic) {
+            let (end, name) = tag_end(b, lt + 1);
+            (end, Some(name))
+        } else if rest.first() == Some(&b'/') && rest.get(1).is_some_and(u8::is_ascii_alphabetic) {
+            // An end tag: harmless, but its attributes are quoted like a start tag's.
+            (tag_end(b, lt + 2).0, None)
+        } else if matches!(rest.first(), Some(b'!' | b'?' | b'/')) {
+            // A bogus comment such as <!doctype> or <?xml>, closed by the first '>'.
+            let end = html[lt..].find('>').map_or(b.len(), |j| lt + j + 1);
+            (end, None)
+        } else {
+            // A '<' that starts nothing is text. Written as an entity, so that
+            // removing a tag right after it can't join it to what follows
+            // ("<<meta>meta …>").
+            out.push_str("&lt;");
+            i = lt + 1;
+            continue;
+        };
+        let name = name.map(|(s, e)| html[s..e].to_ascii_lowercase());
+        if !matches!(name.as_deref(), Some("meta" | "link" | "base")) {
+            out.push_str(&html[lt..end]);
+        }
+        i = end;
+        // Text in these elements is not markup until their end tag.
+        if let Some(name) = name.as_deref() {
+            if name == "plaintext" {
+                out.push_str(&html[i..]);
+                return out;
+            }
+            if matches!(
+                name,
+                "style"
+                    | "script"
+                    | "title"
+                    | "textarea"
+                    | "xmp"
+                    | "iframe"
+                    | "noembed"
+                    | "noframes"
+            ) {
+                let close = raw_text_end(b, i, name.as_bytes());
+                out.push_str(&html[i..close]);
+                i = close;
+            }
+        }
+    }
+    out.push_str(&html[i..]);
+    out
+}
+
+fn is_html_space(c: u8) -> bool {
+    matches!(c, b' ' | b'\t' | b'\n' | b'\r' | b'\x0c')
+}
+
+/// Where a comment whose text starts at `from` ends (just past its `-->`).
+fn comment_end(b: &[u8], from: usize) -> usize {
+    let rest = &b[from..];
+    // <!--> and <!---> close at once.
+    if rest.starts_with(b">") {
+        return from + 1;
+    }
+    if rest.starts_with(b"->") {
+        return from + 2;
+    }
+    let find = |pat: &[u8]| {
+        rest.windows(pat.len())
+            .position(|w| w == pat)
+            .map(|j| from + j + pat.len())
+    };
+    match (find(b"-->"), find(b"--!>")) {
+        (Some(a), Some(c)) => a.min(c),
+        (a, c) => a.or(c).unwrap_or(b.len()),
+    }
+}
+
+/// Where a tag whose name starts at `from` ends (just past its '>'), and the
+/// byte range of its name. Follows the browser's attribute states, so a
+/// '>' inside a quoted value does not end the tag but a stray quote that
+/// isn't a value does not start one.
+fn tag_end(b: &[u8], from: usize) -> (usize, (usize, usize)) {
+    #[derive(PartialEq)]
+    enum S {
+        Name,
+        BeforeAttr,
+        Attr,
+        AfterAttr,
+        BeforeValue,
+        Quoted(u8),
+        Unquoted,
+    }
+    let mut s = S::Name;
+    let mut name_end = b.len();
+    let mut i = from;
+    while i < b.len() {
+        let c = b[i];
+        if s == S::Name && (is_html_space(c) || c == b'/' || c == b'>') {
+            name_end = i;
+        }
+        s = match s {
+            S::Quoted(q) if c == q => S::BeforeAttr,
+            S::Quoted(q) => S::Quoted(q),
+            _ if c == b'>' => return (i + 1, (from, i.min(name_end))),
+            S::BeforeValue if c == b'"' || c == b'\'' => S::Quoted(c),
+            S::BeforeValue if is_html_space(c) => S::BeforeValue,
+            S::BeforeValue => S::Unquoted,
+            S::Unquoted if is_html_space(c) => S::BeforeAttr,
+            S::Unquoted => S::Unquoted,
+            S::Attr | S::AfterAttr if c == b'=' => S::BeforeValue,
+            S::AfterAttr if is_html_space(c) => S::AfterAttr,
+            S::Attr if is_html_space(c) => S::AfterAttr,
+            _ if is_html_space(c) || c == b'/' => S::BeforeAttr,
+            S::Name => S::Name,
+            _ => S::Attr,
+        };
+        i += 1;
+    }
+    // Unclosed: the tag runs to the end of the input.
+    (b.len(), (from, name_end))
+}
+
+/// Where the text of a raw-text element such as `<style>` ends: at its
+/// `</name` end tag, or the end of input.
+fn raw_text_end(b: &[u8], from: usize, name: &[u8]) -> usize {
+    let mut i = from;
+    while let Some(j) = b[i..].windows(2).position(|w| w == b"</") {
+        let at = i + j;
+        let after = at + 2 + name.len();
+        if b.len() >= after
+            && b[at + 2..after].eq_ignore_ascii_case(name)
+            && b.get(after)
+                .is_none_or(|&c| is_html_space(c) || c == b'/' || c == b'>')
+        {
+            return at;
+        }
+        i = at + 2;
+    }
+    b.len()
 }
 
 /// The bytes of attachment `index` as `render` numbered it.
@@ -431,7 +627,10 @@ pub fn trim_quote(text: &str) -> (&str, bool) {
 }
 
 fn inner_body(html: &str) -> String {
-    let lower = html.to_lowercase();
+    // ASCII lowercasing keeps every byte where it was, so offsets found in
+    // `lower` are valid in `html`. Full Unicode lowercasing changes lengths
+    // (İ grows, the Kelvin sign shrinks) and slicing with them panics.
+    let lower = html.to_ascii_lowercase();
     let start = lower
         .find("<body")
         .and_then(|i| lower[i..].find('>').map(|j| i + j + 1))
@@ -440,7 +639,7 @@ fn inner_body(html: &str) -> String {
         .rfind("</body>")
         .filter(|e| *e >= start)
         .unwrap_or(html.len());
-    html[start..end].to_string()
+    strip_nav_tags(&html[start..end])
 }
 
 pub fn text_to_html(text: &str) -> String {
@@ -563,5 +762,105 @@ Sounds good, see https://example.com/plan.\r\n\r\nOn Mon, Nov 2, 2026 at 9:00 AM
         assert_eq!(s.message_id, "<abc@example.com>");
         assert!(s.html.starts_with("<p>Hello</p>"));
         assert_eq!(s.attachments.len(), 1);
+    }
+
+    #[test]
+    fn inner_body_survives_case_changing_characters() {
+        let html = "<html><head><title>İ</title></head><body>Üç gün</body></html>";
+        assert_eq!(inner_body(html), "Üç gün");
+        let body = "İ".repeat(20);
+        let html = format!("<html><body>{body}</body></html>");
+        assert_eq!(inner_body(&html), body);
+        // The Kelvin sign shrinks when lowercased.
+        let html = "<p>\u{212A}\u{212A}\u{212A}</p><BODY class=x>K\u{212A}</BODY>";
+        assert_eq!(inner_body(html), "K\u{212A}");
+    }
+
+    fn mail_with_image(html: &str) -> String {
+        format!(
+            "From: a@example.com\r\nMIME-Version: 1.0\r\n\
+Content-Type: multipart/related; boundary=\"b\"\r\n\r\n\
+--b\r\nContent-Type: text/html; charset=utf-8\r\n\r\n{html}\r\n\
+--b\r\nContent-Type: image/png\r\nContent-ID: <logo>\r\n\
+Content-Transfer-Encoding: base64\r\n\r\niVBORw0KGgo=\r\n--b--\r\n"
+        )
+    }
+
+    #[test]
+    fn cid_inlining_is_bounded() {
+        let uri = "data:image/png;base64,iVBORw0KGgo=";
+        let html = "<img src=\"cid:logo\">".repeat(1000);
+        let raw = mail_with_image(&html);
+        let msg = MessageParser::default().parse(raw.as_bytes()).unwrap();
+        let parts = all_attachments(&msg);
+
+        let mut used = Vec::new();
+        let out = inline_cids(&html, &parts, uri.len() * 3 + 1, &mut used);
+        assert_eq!(out.matches(uri).count(), 3);
+        assert_eq!(
+            out.matches("cid:logo").count(),
+            997,
+            "the rest are untouched"
+        );
+        assert_eq!(used, vec![parts[0].id()]);
+
+        let mut used = Vec::new();
+        let out = inline_cids(&html, &parts, uri.len() - 1, &mut used);
+        assert_eq!(out, html);
+        assert!(used.is_empty(), "never inlined, so not marked used");
+
+        // A handful of uses fits the real budget and renders as before.
+        let html = "<img src=\"cid:logo\"><p>x</p><img src=\"cid:logo\">";
+        let mut used = Vec::new();
+        let out = inline_cids(html, &parts, MAX_INLINED_BYTES, &mut used);
+        assert_eq!(out, html.replace("cid:logo", uri));
+        assert_eq!(used.len(), 1);
+    }
+
+    #[test]
+    fn navigation_tags_are_stripped_from_received_html() {
+        let html = "<html><head><meta http-equiv=\"refresh\" content=\"0;url=https://attacker.example/\">\
+<LINK rel=preconnect href=\"https://attacker.example\"></head>\
+<body><base href=\"https://attacker.example/\"><p title=\"a>b\">Hi</p>\
+<Meta content='x>y' http-equiv=refresh><img src=\"cid:logo\"></body></html>";
+        let raw = mail_with_image(html);
+
+        let r = render(raw.as_bytes(), &Options::default());
+        let lower = r.html.to_ascii_lowercase();
+        assert!(!lower.contains("refresh"), "{}", r.html);
+        assert!(!lower.contains("<link") && !lower.contains("<base"));
+        assert!(!lower.contains("attacker"));
+        assert!(r.html.contains("<p title=\"a>b\">Hi</p>"));
+        assert!(r.html.contains("<meta charset=\"utf-8\">"));
+        assert!(
+            r.html
+                .contains("<meta http-equiv=\"Content-Security-Policy\" content=\"default-src")
+        );
+
+        let s = source(raw.as_bytes()).unwrap();
+        assert_eq!(s.html, "<p title=\"a>b\">Hi</p><img src=\"cid:logo\">");
+    }
+
+    #[test]
+    fn stripping_follows_browser_tokenizing() {
+        // Lookalike names and tags inside quotes or comments are left alone.
+        let keep = "<metadata x><linked><a title='<meta http-equiv=refresh>'>a</a>\
+<!-- <base href=x> --><style>p::after{content:\"<link>\"}</style><b>";
+        assert_eq!(strip_nav_tags(keep), keep);
+        // A quote that isn't an attribute value doesn't hide what follows.
+        assert_eq!(strip_nav_tags("<a = \">\"<meta x>\"z"), "<a = \">\"\"z");
+        // Nor does a comment or style block that the browser has closed.
+        assert_eq!(
+            strip_nav_tags("<!-- a=\" --><meta x>\"<style>\"</style><link y>"),
+            "<!-- a=\" -->\"<style>\"</style>"
+        );
+        // Removing a tag can't assemble a new one from the pieces.
+        assert_eq!(
+            strip_nav_tags("<<meta>meta http-equiv=refresh>"),
+            "&lt;meta http-equiv=refresh>"
+        );
+        assert_eq!(strip_nav_tags("<me<meta>ta x>"), "<me<meta>ta x>");
+        // Unclosed tags and non-ASCII text don't upset the offsets.
+        assert_eq!(strip_nav_tags("İ<b>ü</b><meta x"), "İ<b>ü</b>");
     }
 }

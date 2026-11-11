@@ -166,9 +166,26 @@ impl Store {
         // The window and the service each hold connections; a writer waits
         // for the other rather than failing.
         db.busy_timeout(Duration::from_secs(10))?;
+        // Checked before anything touches the file, journal mode included:
+        // an older Chord must leave a newer schema exactly as it found it, or
+        // the newer one would later re-run its migration over it.
+        let version = schema_version(&db)?;
         db.pragma_update(None, "journal_mode", "WAL")?;
         db.pragma_update(None, "foreign_keys", "ON")?;
-        let version: i32 = db.pragma_query_value(None, "user_version", |r| r.get(0))?;
+        // A current cache (the common case; the window opens a Store several
+        // times per keypress) only reads below: the tables all exist. Anything
+        // else migrates in one transaction, so a crash can't leave a migrated
+        // schema still stamped with the old version. IMMEDIATE takes the write
+        // lock before re-reading the version, so two processes opening an old
+        // or fresh cache at once migrate it only once. Dropping the connection
+        // on an error rolls the transaction back.
+        let migrating = version != SCHEMA_VERSION;
+        let version = if migrating {
+            db.execute_batch("BEGIN IMMEDIATE")?;
+            schema_version(&db)?
+        } else {
+            version
+        };
         if version == 1 {
             // Version 1 held only a message cache, which Gmail can rebuild.
             db.execute_batch(
@@ -249,7 +266,12 @@ impl Store {
                  message_id TEXT PRIMARY KEY
              );",
         )?;
-        db.pragma_update(None, "user_version", SCHEMA_VERSION)?;
+        if version != SCHEMA_VERSION {
+            db.pragma_update(None, "user_version", SCHEMA_VERSION)?;
+        }
+        if migrating {
+            db.execute_batch("COMMIT")?;
+        }
         Ok(Self { db })
     }
 
@@ -695,12 +717,17 @@ impl Store {
         Ok(())
     }
 
-    pub fn op_failed(&self, id: i64, error: &str) -> Result<()> {
-        self.db.execute(
-            "UPDATE ops SET attempts = attempts + 1, last_error = ?2 WHERE id = ?1",
-            params![id, error],
-        )?;
-        Ok(())
+    /// Records why a queued action failed and returns how many times Gmail
+    /// has rejected it. Only rejections count (`rejected`): network trouble
+    /// and server errors say nothing about the action, and a laptop offline
+    /// for a day must keep its queue.
+    pub fn op_failed(&self, id: i64, error: &str, rejected: bool) -> Result<i64> {
+        Ok(self.db.query_row(
+            "UPDATE ops SET attempts = attempts + ?3, last_error = ?2 WHERE id = ?1
+             RETURNING attempts",
+            params![id, error, i64::from(rejected)],
+            |r| r.get(0),
+        )?)
     }
 
     /// The most recent error from a queued action that hasn't gone through.
@@ -910,6 +937,19 @@ fn record_contacts(tx: &rusqlite::Transaction, m: &MessageRow) -> Result<()> {
     Ok(())
 }
 
+/// The schema version stamped in the file, refusing one from a newer Chord.
+fn schema_version(db: &Connection) -> Result<i32> {
+    let version: i32 = db.pragma_query_value(None, "user_version", |r| r.get(0))?;
+    if version > SCHEMA_VERSION {
+        anyhow::bail!(
+            "this mail cache was made by a newer version of Chord \
+             (schema {version}; this version knows up to {SCHEMA_VERSION}); \
+             update Chord to use it"
+        );
+    }
+    Ok(version)
+}
+
 #[cfg(test)]
 pub(crate) mod tests {
     use super::*;
@@ -1070,5 +1110,103 @@ pub(crate) mod tests {
             store.take_unnotified(&["b".into(), "c".into()]).unwrap(),
             ["c"]
         );
+    }
+
+    /// A cache file in a fresh directory, removed by the caller.
+    fn temp_db(name: &str) -> (std::path::PathBuf, std::path::PathBuf) {
+        let dir = std::env::temp_dir().join(format!(
+            "chord-store-{name}-{}-{:x}",
+            std::process::id(),
+            rand::random::<u64>()
+        ));
+        std::fs::create_dir_all(&dir).unwrap();
+        let path = dir.join("mail.db");
+        (dir, path)
+    }
+
+    fn user_version(path: &Path) -> i32 {
+        Connection::open(path)
+            .unwrap()
+            .pragma_query_value(None, "user_version", |r| r.get(0))
+            .unwrap()
+    }
+
+    #[test]
+    fn a_cache_from_a_newer_chord_is_refused_untouched() {
+        let (dir, path) = temp_db("newer");
+        let raw = Connection::open(&path).unwrap();
+        raw.execute_batch("CREATE TABLE future (x INTEGER);")
+            .unwrap();
+        raw.pragma_update(None, "user_version", SCHEMA_VERSION + 1)
+            .unwrap();
+        drop(raw);
+
+        let err = Store::open(&path)
+            .err()
+            .expect("a newer cache must not open");
+        assert!(err.to_string().contains("newer version of Chord"), "{err}");
+        assert_eq!(user_version(&path), SCHEMA_VERSION + 1);
+        // Not even switched to WAL.
+        let mode: String = Connection::open(&path)
+            .unwrap()
+            .pragma_query_value(None, "journal_mode", |r| r.get(0))
+            .unwrap();
+        assert_eq!(mode, "delete");
+        std::fs::remove_dir_all(dir).unwrap();
+    }
+
+    #[test]
+    fn reopening_a_current_cache_writes_nothing() {
+        let (dir, path) = temp_db("reopen");
+        Store::open(&path).unwrap();
+        assert_eq!(user_version(&path), SCHEMA_VERSION);
+        // data_version changes whenever another connection commits a write.
+        let observer = Connection::open(&path).unwrap();
+        let data_version = || -> i64 {
+            observer
+                .pragma_query_value(None, "data_version", |r| r.get(0))
+                .unwrap()
+        };
+        let before = data_version();
+        Store::open(&path).unwrap();
+        Store::open(&path).unwrap();
+        assert_eq!(data_version(), before);
+        // And the observer does see a real write.
+        Store::open(&path).unwrap().set_meta("k", "v").unwrap();
+        assert_ne!(data_version(), before);
+        std::fs::remove_dir_all(dir).unwrap();
+    }
+
+    #[test]
+    fn version_1_cache_is_migrated_once() {
+        let (dir, path) = temp_db("v1");
+        let raw = Connection::open(&path).unwrap();
+        raw.execute_batch(
+            "CREATE TABLE meta (key TEXT PRIMARY KEY, value TEXT NOT NULL);
+             INSERT INTO meta VALUES ('history_id', '7'), ('email', 'me@example.com');
+             CREATE TABLE messages (id TEXT PRIMARY KEY, thread_id TEXT NOT NULL);
+             INSERT INTO messages VALUES ('old', 't');",
+        )
+        .unwrap();
+        raw.pragma_update(None, "user_version", 1).unwrap();
+        drop(raw);
+
+        let mut store = Store::open(&path).unwrap();
+        assert_eq!(user_version(&path), SCHEMA_VERSION);
+        assert_eq!(store.meta("history_id").unwrap(), None);
+        assert_eq!(
+            store.meta("email").unwrap().as_deref(),
+            Some("me@example.com")
+        );
+        // The message table was rebuilt in the current shape.
+        store
+            .apply(false, &[row("a", "t1", 1, &["INBOX"])], &[], Some("1"))
+            .unwrap();
+        assert_eq!(store.thread_ids(Some("INBOX")).unwrap(), ["t1"]);
+        drop(store);
+        // A second open doesn't migrate again and lose the new history id.
+        let store = Store::open(&path).unwrap();
+        assert_eq!(store.meta("history_id").unwrap().as_deref(), Some("1"));
+        std::fs::remove_dir_all(dir).unwrap();
     }
 }

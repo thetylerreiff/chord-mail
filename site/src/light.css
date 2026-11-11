@@ -39,24 +39,16 @@
 /* Callouts on hairlines, pointing into the figure. Offsets match the inbox:
    caption 26px, header 45px, rows 46px. */
 .notes { list-style: none; margin: 0; padding: 0; position: relative; height: 100%; min-height: 360px; }
-.notes li { position: absolute; left: 0; right: -28px; display: flex; gap: 8px; align-items: flex-start; }
-.notes li span { flex: 0 1 176px; }
-.notes li::after { content: ''; flex: 1; min-width: 24px; height: 1px; background: var(--ink); margin-top: 7px; }
+.notes li { position: absolute; left: 0; right: -28px; display: flex; gap: 8px; align-items: baseline; padding-right: 0; }
+.notes li::after { content: ''; flex: 1; min-width: 24px; height: 1px; background: var(--ink); align-self: center; }
 .notes b { color: var(--signal); font-weight: 500; }
-.notes kbd { height: 17px; min-width: 17px; font-size: 10px; vertical-align: -3px; }
-.n1 { top: calc(50% - 135px); }
-.n2 { top: calc(50% - 87px); }
-.n3 { top: calc(50% + 146px); }
-
-/* Below 1400px the three columns squeeze the inbox: drop the callouts first. (ol.notes: the plate's SVG
-   callouts share the class and are handled by the 1100px rule.) */
-@media (max-width: 1399px) {
-  .stage { grid-template-columns: minmax(0, 1fr) 360px; }
-  ol.notes { display: none; }
-}
+.notes kbd { height: 17px; min-width: 17px; font-size: 10px; }
+.n1 { top: calc(50% - 141px); }
+.n2 { top: calc(50% - 101px); }
+.n3 { top: calc(50% + 140px); }
 
 .fig { margin: 0; display: grid; gap: 8px; min-width: 0; }
-.fig figcaption { display: flex; justify-content: space-between; gap: 12px; }
+.fig figcaption { display: flex; justify-content: space-between; }
 .inbox { box-shadow: 0 1px 0 var(--rule), 0 24px 48px -32px rgb(0 0 0 / 0.25); }
 
 .side { display: grid; gap: 16px; align-content: center; }
@@ -78,9 +70,6 @@
 }
 .install-foot button { background: var(--ink); color: #fff; border: 0; padding: 8px 14px; cursor: pointer; }
 .install-foot button:hover { background: #fff; color: var(--ink); }
-.install-note { margin: 0; }
-.install-note a { text-decoration: underline; text-underline-offset: 3px; }
-.install-note a:hover { color: #fff; }
 .install-foot a { text-decoration: none; }
 .install-foot a:hover { text-decoration: underline; text-underline-offset: 3px; }
 
@@ -90,18 +79,7 @@
 @media (max-width: 1100px) {
   .stage { grid-template-columns: minmax(0, 1fr); gap: 24px; }
   .notes { display: none; }
-  .rail .tag { display: none; }
-  /* One column: the headline and lede lead, then the figure, then the spec and install (no copy in the HTML). */
-  .side { display: contents; }
-  .title { order: 1; }
-  .lede { order: 2; margin-top: -12px; }
-  .fig { order: 3; }
-  .spec { order: 4; }
-  .install { order: 5; }
-}
-@media (max-width: 760px) {
-  .nav a { padding: 0 12px; white-space: nowrap; }
-  .nav a[href$='#connect-gmail'] { display: none; } /* still in the footer */
+  .rail .label { display: none; }
 }
 
 /* --- The keymap plate, on A's ground ------------------------------------- */
@@ -174,7 +152,6 @@
   .board-wrap { -webkit-mask-image: linear-gradient(90deg, transparent, #000 28px, #000 calc(100% - 28px), transparent); mask-image: linear-gradient(90deg, transparent, #000 28px, #000 calc(100% - 28px), transparent); }
   .board-wrap { overflow-x: auto; justify-items: start; margin-inline: calc(var(--gutter) * -1); padding-inline: var(--gutter); scroll-snap-type: x proximity; }
   .board-svg { width: 780px; max-width: none; max-height: none; }
-  .say { align-items: flex-start; } /* the readout sits right under the keys; its two-line room stays below */
 }
 
 /* The narrowest phones: keep the command's second line unbroken. */
