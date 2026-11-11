@@ -142,12 +142,12 @@ impl Config {
     /// Loads the config, writing the commented default the first time.
     pub fn load() -> Result<Self> {
         let path = crate::paths::config_dir().join("config.toml");
+        if let Some(dir) = path.parent() {
+            let _ = crate::paths::private_dir(dir);
+        }
         match std::fs::read_to_string(&path) {
             Ok(text) => Self::parse(&text).with_context(|| format!("in {}", path.display())),
             Err(_) => {
-                if let Some(dir) = path.parent() {
-                    let _ = std::fs::create_dir_all(dir);
-                }
                 let _ = std::fs::write(&path, TEMPLATE);
                 Ok(Self::default())
             }

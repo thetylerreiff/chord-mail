@@ -33,6 +33,49 @@ pub struct Client {
 }
 
 impl Client {
+    /// Chord's own Google client, compiled into release builds from the CI
+    /// secrets `CHORD_GOOGLE_CLIENT_ID` and `CHORD_GOOGLE_CLIENT_SECRET`.
+    /// Builds from source have none. Google documents an installed app's
+    /// secret as not confidential, but its API terms keep developer
+    /// credentials out of open-source code, so this keeps it out of the
+    /// repository, not out of the binary.
+    pub fn builtin() -> Option<Self> {
+        Self::from_parts(
+            option_env!("CHORD_GOOGLE_CLIENT_ID"),
+            option_env!("CHORD_GOOGLE_CLIENT_SECRET"),
+        )
+    }
+
+    fn from_parts(id: Option<&str>, secret: Option<&str>) -> Option<Self> {
+        let id = id?.trim();
+        let secret = secret?.trim();
+        (id.ends_with(".apps.googleusercontent.com") && !secret.is_empty()).then(|| Self {
+            id: id.to_string(),
+            secret: secret.to_string(),
+        })
+    }
+
+    /// The client Chord signs in with: your own `client_secret.json` when
+    /// there is one, otherwise the built-in client. A file that's there but
+    /// unreadable stays an error rather than quietly switching clients.
+    pub fn resolve(path: &Path) -> Result<Self> {
+        if path.exists() {
+            return Self::load(path);
+        }
+        Self::builtin().ok_or_else(|| {
+            anyhow!(
+                "no OAuth client at {}; this build has no built-in Google client, \
+                 so see the README for how to create your own",
+                path.display()
+            )
+        })
+    }
+
+    /// Whether there is any client to sign in with.
+    pub fn available(path: &Path) -> bool {
+        path.exists() || Self::builtin().is_some()
+    }
+
     /// Reads the JSON file Google Cloud Console offers for a "Desktop app"
     /// OAuth client, which nests the fields under "installed".
     pub fn load(path: &Path) -> Result<Self> {
@@ -70,6 +113,11 @@ pub struct Token {
     pub refresh_token: String,
     /// Unix seconds.
     pub expires_at: i64,
+    /// The OAuth client that issued this sign-in. Google only refreshes a
+    /// token for the client it was issued to. Empty in tokens saved before
+    /// Chord recorded it.
+    #[serde(default)]
+    pub client_id: String,
 }
 
 impl Token {
@@ -84,7 +132,7 @@ impl Token {
     /// by other users, even for an instant.
     pub fn save(&self, path: &Path) -> Result<()> {
         if let Some(dir) = path.parent() {
-            std::fs::create_dir_all(dir)?;
+            crate::paths::private_dir(dir)?;
         }
         let tmp = path.with_extension("json.tmp");
         let mut file = std::fs::OpenOptions::new()
@@ -97,6 +145,11 @@ impl Token {
         file.sync_all()?;
         std::fs::rename(&tmp, path)?;
         Ok(())
+    }
+
+    /// Whether this sign-in can be refreshed with `client`.
+    pub fn issued_to(&self, client: &Client) -> bool {
+        self.client_id.is_empty() || self.client_id == client.id
     }
 
     fn is_fresh(&self) -> bool {
@@ -196,6 +249,7 @@ pub async fn login(
             .refresh_token
             .ok_or_else(|| anyhow!("Google didn't return a refresh token"))?,
         expires_at: now() + resp.expires_in,
+        client_id: client.id.clone(),
     })
 }
 
@@ -261,6 +315,11 @@ async fn respond(stream: &mut tokio::net::TcpStream, status: &str, message: &str
 /// about to expire.
 pub async fn access_token(http: &reqwest::Client, client: &Client, path: &Path) -> Result<String> {
     let mut token = Token::load(path)?;
+    if !token.issued_to(client) {
+        bail!(
+            "you signed in with a different OAuth client than Chord is using now; run `chord-mail login` again"
+        );
+    }
     if !token.is_fresh() {
         let resp = post_token(
             http,
@@ -278,6 +337,8 @@ pub async fn access_token(http: &reqwest::Client, client: &Client, path: &Path) 
         if let Some(refresh) = resp.refresh_token {
             token.refresh_token = refresh;
         }
+        // Google accepted the refresh, so the token belongs to this client.
+        token.client_id = client.id.clone();
         token.save(path)?;
     }
     Ok(token.access_token)
@@ -310,6 +371,7 @@ mod tests {
             access_token: "a".into(),
             refresh_token: "r".into(),
             expires_at: 42,
+            client_id: "c".into(),
         };
         token.save(&path).unwrap();
         let mode = std::fs::metadata(&path).unwrap().permissions().mode() & 0o777;
@@ -332,5 +394,60 @@ mod tests {
         assert_eq!(client.id, "id.apps.googleusercontent.com");
         assert_eq!(client.secret, "s");
         std::fs::remove_dir_all(dir).unwrap();
+    }
+
+    #[test]
+    fn builtin_client_needs_a_desktop_id_and_a_secret() {
+        let id = Some("1-abc.apps.googleusercontent.com");
+        assert_eq!(Client::from_parts(id, Some(" s ")).unwrap().secret, "s");
+        assert!(Client::from_parts(id, Some("")).is_none());
+        assert!(Client::from_parts(id, None).is_none());
+        assert!(Client::from_parts(Some("not-a-client"), Some("s")).is_none());
+        assert!(Client::from_parts(None, Some("s")).is_none());
+    }
+
+    #[test]
+    fn your_own_client_file_wins_and_a_bad_one_stays_an_error() {
+        let dir = std::env::temp_dir().join(format!("chord-resolve-{}", random_urlsafe(6)));
+        std::fs::create_dir_all(&dir).unwrap();
+        let path = dir.join("client_secret.json");
+        std::fs::write(
+            &path,
+            r#"{"installed":{"client_id":"own.apps.googleusercontent.com","client_secret":"s"}}"#,
+        )
+        .unwrap();
+        assert_eq!(
+            Client::resolve(&path).unwrap().id,
+            "own.apps.googleusercontent.com"
+        );
+        std::fs::write(&path, "{").unwrap();
+        assert!(Client::resolve(&path).is_err());
+        std::fs::remove_file(&path).unwrap();
+        // Without a file, a source build (no built-in client) has nothing to use.
+        assert_eq!(Client::resolve(&path).is_ok(), Client::builtin().is_some());
+        assert_eq!(Client::available(&path), Client::builtin().is_some());
+        std::fs::remove_dir_all(dir).unwrap();
+    }
+
+    #[test]
+    fn a_sign_in_belongs_to_the_client_that_issued_it() {
+        let client = |id: &str| Client {
+            id: id.into(),
+            secret: "s".into(),
+        };
+        let token = |id: &str| Token {
+            access_token: "a".into(),
+            refresh_token: "r".into(),
+            expires_at: 0,
+            client_id: id.into(),
+        };
+        assert!(token("a").issued_to(&client("a")));
+        assert!(!token("a").issued_to(&client("b")));
+        // Saved before Chord recorded the client: assume it still matches.
+        assert!(token("").issued_to(&client("b")));
+        let old: Token =
+            serde_json::from_str(r#"{"access_token":"a","refresh_token":"r","expires_at":1}"#)
+                .unwrap();
+        assert!(old.client_id.is_empty());
     }
 }

@@ -33,7 +33,7 @@ impl Session {
                 .user_agent(concat!("chord-mail/", env!("CARGO_PKG_VERSION")))
                 .timeout(Duration::from_secs(60))
                 .build()?,
-            client: auth::Client::load(&paths::client_secret())?,
+            client: auth::Client::resolve(&paths::client_secret())?,
         })
     }
 
@@ -52,9 +52,13 @@ impl Session {
     }
 }
 
-/// Whether someone has signed in on this machine.
+/// Whether someone has signed in on this machine, with the OAuth client Chord
+/// would use now.
 pub fn signed_in() -> bool {
-    paths::token().is_file() && paths::client_secret().is_file()
+    let Ok(client) = auth::Client::resolve(&paths::client_secret()) else {
+        return false;
+    };
+    auth::Token::load(&paths::token()).is_ok_and(|t| t.issued_to(&client))
 }
 
 /// Held while syncing or flushing, so the window and the service never do
@@ -63,7 +67,7 @@ pub struct Lock(#[allow(dead_code)] File);
 
 pub async fn lock() -> Result<Lock> {
     let path = paths::data_dir().join("sync.lock");
-    std::fs::create_dir_all(paths::data_dir())?;
+    paths::private_dir(&paths::data_dir())?;
     let file = File::options()
         .create(true)
         .truncate(false)

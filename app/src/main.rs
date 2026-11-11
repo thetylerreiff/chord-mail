@@ -194,7 +194,14 @@ async fn run(command: Command) -> Result<()> {
             })
             .await?;
             token.save(&paths::token())?;
-            let profile = session.gmail().await?.profile().await?;
+            let profile = match async { session.gmail().await?.profile().await }.await {
+                Ok(p) => p,
+                Err(e) => {
+                    // Don't leave the new token paired with the old account's data.
+                    let _ = std::fs::remove_file(paths::token());
+                    return Err(e);
+                }
+            };
             let store = Store::open(&paths::database())?;
             let previous = store.account()?;
             if !previous.is_empty() && !previous.eq_ignore_ascii_case(&profile.email_address) {

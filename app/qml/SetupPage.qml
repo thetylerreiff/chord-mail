@@ -2,8 +2,9 @@ import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
 
-// First run: Chord needs your own Google OAuth client, then a sign-in.
-// The page notices the client file appear on its own.
+// First run: sign in with Google. Release builds carry Chord's own OAuth
+// client; a build without one asks for yours first, and the page notices the
+// client file appear on its own.
 Rectangle {
     id: setup
     color: theme.background
@@ -40,8 +41,8 @@ Rectangle {
         Text {
             Layout.fillWidth: true
             text: backend.setup === "client"
-                  ? qsTr("Connect Chord to Gmail with your own Google OAuth client. No one else ever sees your mail.")
-                  : qsTr("One more step: sign in with Google.")
+                  ? qsTr("This build of Chord has no built-in Google client, so connect it to Gmail with your own. No one else ever sees your mail.")
+                  : qsTr("Sign in with Google to connect Chord to Gmail. Your mail goes straight from Google to this computer.")
             color: theme.bright
             font.family: theme.font
             font.pixelSize: 16

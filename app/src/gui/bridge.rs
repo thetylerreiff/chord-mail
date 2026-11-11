@@ -413,9 +413,9 @@ impl qobject::Backend {
     fn check_setup(mut self: Pin<&mut Self>) {
         let state = if demo() {
             "ready"
-        } else if !paths::client_secret().is_file() {
+        } else if !auth::Client::available(&paths::client_secret()) {
             "client"
-        } else if !paths::token().is_file() {
+        } else if !service::signed_in() {
             "login"
         } else {
             "ready"
@@ -441,7 +441,14 @@ impl qobject::Backend {
                 })
                 .await?;
                 token.save(&paths::token())?;
-                let profile = session.gmail().await?.profile().await?;
+                let profile = match async { session.gmail().await?.profile().await }.await {
+                    Ok(p) => p,
+                    Err(e) => {
+                        // Don't leave the new token paired with the old account's data.
+                        let _ = std::fs::remove_file(paths::token());
+                        return Err(e);
+                    }
+                };
                 let s = store()?;
                 let previous = s.account()?;
                 if !previous.is_empty() && !previous.eq_ignore_ascii_case(&profile.email_address) {
@@ -1124,7 +1131,7 @@ impl qobject::Backend {
         let (text, line) = compose::template(kind, source.as_ref(), &me, &prefill);
         let dir = drafts_dir();
         let path = dir.join(format!("{}.md", sync::now_ms()));
-        let result = std::fs::create_dir_all(&dir).and_then(|_| std::fs::write(&path, text));
+        let result = paths::private_dir(&dir).and_then(|_| std::fs::write(&path, text));
         if let Err(e) = result {
             self.fail(e.into());
             return;
@@ -1504,7 +1511,10 @@ impl qobject::Backend {
                 return;
             }
         };
-        self.as_mut().finish_compose();
+        // Close the compose UI now, but keep the file until the upload works.
+        let path = self.as_mut().rust_mut().compose.take().map(|c| c.path);
+        self.as_mut().set_review(QString::default());
+        self.as_mut().set_composing(false);
         self.spawn(async move {
             let result: Result<()> = async {
                 let api = Session::new()?.gmail().await?;
@@ -1513,8 +1523,24 @@ impl qobject::Backend {
             }
             .await;
             Box::new(move |mut b: Pin<&mut qobject::Backend>| match result {
-                Ok(()) => b.as_mut().toast("draft-saved", 0, "", false),
-                Err(e) => b.fail(e),
+                Ok(()) => {
+                    if let Some(path) = &path {
+                        let _ = std::fs::remove_file(path);
+                    }
+                    b.as_mut().toast("draft-saved", 0, "", false);
+                }
+                Err(e) => {
+                    // One toast slot: carry the kept path in the error itself.
+                    let e = match &path {
+                        Some(path) => {
+                            let kept = path.with_extension("kept.md");
+                            let _ = std::fs::rename(path, &kept);
+                            e.context(format!("draft kept at {}", kept.display()))
+                        }
+                        None => e,
+                    };
+                    b.fail(e);
+                }
             }) as Apply
         });
     }

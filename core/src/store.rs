@@ -153,7 +153,7 @@ pub struct Store {
 impl Store {
     pub fn open(path: &Path) -> Result<Self> {
         if let Some(dir) = path.parent() {
-            std::fs::create_dir_all(dir)?;
+            crate::paths::private_dir(dir)?;
         }
         Self::init(Connection::open(path)?)
     }
@@ -293,8 +293,16 @@ impl Store {
         let pending = self.pending_ops()?;
         let tx = self.db.transaction()?;
         if reset {
-            tx.execute("DELETE FROM messages", [])?;
-            tx.execute("DELETE FROM complete_threads", [])?;
+            // Snoozed and reminded threads sit outside INBOX, so a resync
+            // wouldn't bring them back; keep them for `wake_due`.
+            tx.execute(
+                "DELETE FROM messages WHERE thread_id NOT IN (SELECT thread_id FROM snoozes)",
+                [],
+            )?;
+            tx.execute(
+                "DELETE FROM complete_threads WHERE thread_id NOT IN (SELECT thread_id FROM snoozes)",
+                [],
+            )?;
         }
         for m in upserts {
             let labels = replay(&pending, m);
@@ -1007,6 +1015,28 @@ pub(crate) mod tests {
         assert_eq!(store.pending_ops().unwrap().len(), 1);
         assert_eq!(store.snoozes().unwrap().len(), 1);
         assert_eq!(store.count().unwrap(), 1);
+    }
+
+    #[test]
+    fn reset_keeps_snoozed_threads_so_they_can_wake() {
+        let mut store = Store::in_memory().unwrap();
+        store
+            .apply(false, &[row("a", "t1", 1, &["SNOOZED"])], &[], None)
+            .unwrap();
+        store.mark_complete("t1").unwrap();
+        store
+            .set_snooze(&Snooze {
+                thread_id: "t1".into(),
+                until: 5,
+                kind: SnoozeKind::Snooze,
+                since: 0,
+            })
+            .unwrap();
+        store.apply(true, &[], &[], Some("5")).unwrap();
+        assert_eq!(store.thread_messages("t1").unwrap().len(), 1);
+        assert!(store.is_complete("t1").unwrap());
+        let (woke, _) = crate::service::wake_due(&mut store).unwrap();
+        assert_eq!(woke, 1);
     }
 
     #[test]

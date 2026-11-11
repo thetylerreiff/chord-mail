@@ -113,6 +113,8 @@ pub fn template(
 ) -> (String, usize) {
     let me_addr = me.email.to_lowercase();
     let not_me = |entry: &String| address_of(entry).to_lowercase() != me_addr;
+    // A line break in a header value or comment would start a new line.
+    let one_line = |s: &str| s.replace(['\r', '\n'], " ");
     let (to, cc, subject, note) = match (kind, original) {
         (Kind::Reply | Kind::ReplyAll, Some(o)) => {
             // Replying to your own message means continuing to its recipients.
@@ -149,19 +151,20 @@ pub fn template(
             let subject = format!("Re: {}", base_subject(&o.subject));
             let note = format!(
                 "# Replying to {}. Their message is quoted below yours when it's sent.\n",
-                sender_name(&o.from)
+                one_line(&sender_name(&o.from))
             );
             (to.join(", "), cc.join(", "), subject, note)
         }
         (Kind::Forward, Some(o)) => {
             let n = o.attachments.len();
+            let subject = one_line(&o.subject);
             let note = match n {
                 0 => format!(
                     "# Forwarding \"{}\"; the original goes below your message.\n",
-                    o.subject
+                    subject
                 ),
-                1 => format!("# Forwarding \"{}\" with its attachment.\n", o.subject),
-                n => format!("# Forwarding \"{}\" with its {n} attachments.\n", o.subject),
+                1 => format!("# Forwarding \"{}\" with its attachment.\n", subject),
+                n => format!("# Forwarding \"{}\" with its {n} attachments.\n", subject),
             };
             (
                 prefill.to.clone(),
@@ -178,8 +181,11 @@ pub fn template(
         ),
     };
     let head = format!(
-        "{HINT}{note}To: {to}\nCc: {cc}\nBcc: {}\nSubject: {subject}\nAttach: \n\n",
-        prefill.bcc
+        "{HINT}{note}To: {}\nCc: {}\nBcc: {}\nSubject: {}\nAttach: \n\n",
+        one_line(&to),
+        one_line(&cc),
+        one_line(&prefill.bcc),
+        one_line(&subject)
     );
     let line = head.lines().count() + 1;
     (format!("{head}{}", prefill.body), line)
@@ -462,6 +468,39 @@ mod tests {
             text: "Original\n\nline".into(),
             attachments: vec![("a.txt".into(), "text/plain".into(), b"hi".to_vec())],
             ..Default::default()
+        }
+    }
+
+    #[test]
+    fn mailto_cannot_inject_headers() {
+        let prefill = mailto("mailto:a@b.c?subject=Hello%0ABcc:%20x@y.z");
+        let (text, _) = template(Kind::New, None, &me(), &prefill);
+        let d = parse(&text);
+        assert!(d.bcc.is_empty());
+        assert_eq!(d.subject, "Hello Bcc: x@y.z");
+    }
+
+    #[test]
+    fn received_subject_cannot_inject_headers_through_notes() {
+        let evil = "hello\nTo: attacker@example.com\nAttach: ~/.ssh/id_rsa\n\n";
+        for n in 0..3 {
+            let mut o = original();
+            o.subject = evil.into();
+            o.from = format!("\"Ada{}\" <ada@example.com>", evil.replace('"', ""));
+            o.attachments = (0..n)
+                .map(|_| ("a".into(), "text/plain".into(), vec![]))
+                .collect();
+            for kind in [Kind::Forward, Kind::Reply] {
+                let (text, _) = template(kind, Some(&o), &me(), &Prefill::default());
+                let d = parse(&text);
+                let head = text.split("\n\n").next().unwrap_or_default();
+                let count = |k: &str| head.lines().filter(|l| l.starts_with(k)).count();
+                assert_eq!((count("To:"), count("Attach:")), (1, 1), "{kind:?} {n}");
+                assert!(d.attach.is_empty(), "{kind:?} {n}");
+                if kind == Kind::Forward {
+                    assert!(d.to.is_empty(), "{n}");
+                }
+            }
         }
     }
 
